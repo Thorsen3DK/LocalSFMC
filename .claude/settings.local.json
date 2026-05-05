@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python *)",
+      "Bash(.venv/Scripts/python.exe -m pip install --upgrade pip)",
+      "Bash(.venv/Scripts/python.exe -m pip install -r requirements.txt)",
+      "Bash(.venv/Scripts/python.exe -c \"from web.routes import bp; print\\('routes import OK'\\); print\\('routes:', sorted\\(r.rule for r in bp.deferred_functions\\)\\)\")",
+      "Bash(.venv/Scripts/python.exe -m playwright install chromium)",
+      "Bash(.venv/Scripts/python.exe *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:5000/)",
+      "Bash(curl -sN \"http://127.0.0.1:5000/batch-stream/welcome_email.html?file=test5.csv&sheet=\" --max-time 120)",
+      "Bash(curl -s \"http://127.0.0.1:5000/preview/test.html/raw?file=test2.csv&row=0\")"
+    ]
+  }
+}

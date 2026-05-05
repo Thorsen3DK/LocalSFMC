@@ -6,6 +6,11 @@ using Excel files as Data Extensions.
 """
 
 import os
+import sys
+
+# Add src/ to Python path so packages are importable without prefix
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "src"))
+
 from dotenv import load_dotenv
 from flask import Flask
 
@@ -17,18 +22,18 @@ def create_app() -> Flask:
 
     app = Flask(
         __name__,
-        template_folder=os.path.join(base_dir, "templates"),
+        template_folder=os.path.join(base_dir, "src", "templates"),
         static_folder=os.path.join(base_dir, "static"),
     )
 
-    app.config["EMAILS_DIR"] = os.path.join(base_dir, "emails")
-    app.config["DATA_EXTENSIONS_DIR"] = os.path.join(base_dir, "data_extensions")
-    app.config["OUTPUT_DIR"] = os.path.join(base_dir, "output")
+    app.config["EMAILS_DIR"] = os.path.join(base_dir, "content", "emails")
+    app.config["DATA_EXTENSIONS_DIR"] = os.path.join(base_dir, "content", "data_extensions")
+    app.config["OUTPUT_DIR"] = os.path.join(base_dir, "content", "output")
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB upload limit
     app.secret_key = "localsfmc-dev-key"
 
     # Ensure directories exist
-    for d in ("emails", "data_extensions", "output"):
+    for d in ("content/emails", "content/data_extensions", "content/output"):
         os.makedirs(os.path.join(base_dir, d), exist_ok=True)
 
     from web.routes import bp

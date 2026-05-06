@@ -366,3 +366,157 @@ class SFMCClient:
             page += 1
 
         return all_journeys
+
+    # ------------------------------------------------------------------
+    # Content Block -> Email Mapping
+    # ------------------------------------------------------------------
+
+    def get_emails_for_content_blocks(
+        self,
+        content_blocks: List[Dict[str, Any]],
+        progress_callback=None,
+    ) -> Dict[int, List[Dict[str, Any]]]:
+        """
+        Find which emails reference the given content blocks.
+
+        Scans all email assets for ContentBlockByName/ContentBlockById/ContentBlockByKey
+        references matching the given content block names or IDs.
+
+        Args:
+            content_blocks: List of content block dicts with 'id' and 'name' keys.
+            progress_callback: Optional callable(scanned, total) for progress updates.
+
+        Returns:
+            Dict mapping content_block_id -> list of email dicts {id, name, assetType}.
+        """
+        import re
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import threading
+
+        if not content_blocks:
+            return {}
+
+        # Build lookup sets for matching
+        cb_names_lower = {}  # lower(name) -> content_block_id
+        cb_ids = {}  # str(id) -> content_block_id
+        for cb in content_blocks:
+            cb_names_lower[cb["name"].lower()] = cb["id"]
+            cb_ids[str(cb["id"])] = cb["id"]
+
+        # Pattern to match ContentBlockByName("..."), ContentBlockById(...), ContentBlockByKey("...")
+        pattern = re.compile(
+            r'ContentBlockBy(Name|Id|Key)\s*\(\s*["\']?([^"\')\s]+)["\']?\s*\)',
+            re.IGNORECASE,
+        )
+
+        # Fetch all email assets (types 208 and 207)
+        batch_size = 100
+        max_workers = 5
+        email_type_filter = {
+            "property": "assetType.id",
+            "simpleOperator": "in",
+            "value": [208, 207],
+        }
+
+        def fetch_email_page(page_num: int) -> Dict[str, Any]:
+            request_body = {
+                "page": {"page": page_num, "pageSize": batch_size},
+                "query": email_type_filter,
+            }
+            for attempt in range(3):
+                try:
+                    resp = requests.post(
+                        f"{self.rest_base_uri}/asset/v1/content/assets/query",
+                        headers=self._headers(),
+                        json=request_body,
+                        timeout=120,
+                    )
+                    if resp.ok:
+                        return resp.json()
+                except (requests.exceptions.ConnectionError,
+                        requests.exceptions.ReadTimeout):
+                    if attempt < 2:
+                        import time as _t
+                        _t.sleep(2 ** attempt)
+            return {"items": [], "count": 0}
+
+        # Get first page and total
+        first_data = fetch_email_page(1)
+        total_emails = first_data.get("count", 0)
+        total_pages = (total_emails + batch_size - 1) // batch_size if total_emails > 0 else 1
+
+        # Result mapping: content_block_id -> list of parent emails
+        mapping: Dict[int, List[Dict[str, Any]]] = {cb["id"]: [] for cb in content_blocks}
+        lock = threading.Lock()
+        scanned = [0]
+
+        def process_email_items(items: List[Dict[str, Any]]):
+            for item in items:
+                # Gather all content from the email
+                all_content = []
+                views = item.get("views") or {}
+                for view_val in views.values():
+                    if isinstance(view_val, dict):
+                        c = view_val.get("content", "") or ""
+                        if c:
+                            all_content.append(c)
+                top_content = item.get("content", "") or ""
+                if top_content:
+                    all_content.append(top_content)
+
+                full_text = "\n".join(all_content)
+                if not full_text:
+                    continue
+
+                # Find all ContentBlock references in this email
+                matches = pattern.findall(full_text)
+                matched_cb_ids = set()
+                for match_type, match_value in matches:
+                    match_type_lower = match_type.lower()
+                    if match_type_lower == "name":
+                        cb_id = cb_names_lower.get(match_value.lower())
+                        if cb_id:
+                            matched_cb_ids.add(cb_id)
+                    elif match_type_lower == "id":
+                        cb_id = cb_ids.get(match_value)
+                        if cb_id:
+                            matched_cb_ids.add(cb_id)
+                    elif match_type_lower == "key":
+                        # Key might match name in some cases
+                        cb_id = cb_names_lower.get(match_value.lower())
+                        if cb_id:
+                            matched_cb_ids.add(cb_id)
+
+                if matched_cb_ids:
+                    email_info = {
+                        "id": item.get("id"),
+                        "name": item.get("name", ""),
+                        "assetType": item.get("assetType", {}).get("name", ""),
+                    }
+                    with lock:
+                        for cb_id in matched_cb_ids:
+                            if cb_id in mapping:
+                                mapping[cb_id].append(email_info)
+
+        # Process first page
+        process_email_items(first_data.get("items", []))
+        scanned[0] = min(batch_size, total_emails)
+        if progress_callback:
+            progress_callback(scanned[0], total_emails)
+
+        # Fetch remaining pages in parallel
+        if total_pages > 1:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {
+                    executor.submit(fetch_email_page, p): p
+                    for p in range(2, total_pages + 1)
+                }
+                for future in as_completed(futures):
+                    page_data = future.result()
+                    process_email_items(page_data.get("items", []))
+                    with lock:
+                        scanned[0] = min(scanned[0] + batch_size, total_emails)
+                        if progress_callback:
+                            progress_callback(scanned[0], total_emails)
+
+        return mapping

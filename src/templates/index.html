@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}TScrew Loose Lab — HTML2PDF{% endblock %}
+
+{% block head %}
+<style>
+    .html2pdf-page {
+        max-width: 720px;
+        margin: 40px auto;
+        padding: 0 24px;
+    }
+    .html2pdf-page h1 {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: #2c2c2c;
+        letter-spacing: -0.3px;
+        margin-bottom: 6px;
+    }
+    .html2pdf-page p {
+        font-size: 0.84rem;
+        color: #999;
+        margin-bottom: 28px;
+    }
+    .placeholder-box {
+        border: 2px dashed var(--border);
+        border-radius: 10px;
+        padding: 48px 24px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.88rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="html2pdf-page">
+    <h1>HTML2PDF</h1>
+    <p>Konvertér HTML email-filer til PDF-format.</p>
+    <div class="upload-section">
+        <h2>Upload filer</h2>
+        <div class="upload-grid">
+            <div class="upload-card">
+                <label>Email HTML</label>
+                <input type="file" id="email-html" accept=".html">
+            </div>
+            <div class="upload-card">
+                <label>Sender CSV</label>
+                <input type="file" id="sender-csv" accept=".csv">
+            </div>
+        </div>
+        <div class="actions">
+            <a href="/sheets" class="btn">Vis sheets</a>
+            <a href="/upload/files" class="btn">Uploadede filer</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

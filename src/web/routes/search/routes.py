@@ -95,20 +95,20 @@ def search_query():
                         if em.get("id"):
                             parent_email_ids.add(em["id"])
 
-                # Journey lookup: emails found in results + parent emails of content blocks
-                if include_journeys:
-                    all_email_ids = [item["id"] for item in email_items if item["id"]]
-                    all_email_ids.extend(parent_email_ids)
-                    if all_email_ids:
-                        journey_map = sfmc.get_journeys_for_assets(all_email_ids)
-                        # Attach journeys to email results
-                        for item in results["items"]:
-                            item["journeys"] = journey_map.get(item["id"], [])
-                        # Attach journeys to parent emails of content blocks
-                        for item in results["items"]:
-                            if "parentEmails" in item:
-                                for em in item["parentEmails"]:
-                                    em["journeys"] = journey_map.get(em["id"], [])
+                # Always look up journeys when mapping is on
+                # (the whole point is to see the full chain)
+                all_email_ids = [item["id"] for item in email_items if item["id"]]
+                all_email_ids.extend(parent_email_ids)
+                if all_email_ids:
+                    journey_map = sfmc.get_journeys_for_assets(all_email_ids)
+                    # Attach journeys to email results
+                    for item in results["items"]:
+                        item["journeys"] = journey_map.get(item["id"], [])
+                    # Attach journeys to parent emails of content blocks
+                    for item in results["items"]:
+                        if "parentEmails" in item:
+                            for em in item["parentEmails"]:
+                                em["journeys"] = journey_map.get(em["id"], [])
             elif include_journeys and results["items"]:
                 asset_ids = [item["id"] for item in results["items"] if item["id"]]
                 journey_map = sfmc.get_journeys_for_assets(asset_ids)

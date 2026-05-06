@@ -326,19 +326,59 @@ class SFMCClient:
             # Look through activities for email asset references
             activities = journey.get("activities", [])
             for activity in activities:
-                config_args = activity.get("configurationArguments", {})
-                # Check various places where email ID can be referenced
-                email_id = (
-                    config_args.get("triggeredSend", {}).get("emailId")
-                    or config_args.get("assetId")
-                    or config_args.get("emailId")
-                )
-                if email_id and int(email_id) in asset_id_set:
-                    asset_journeys[int(email_id)].append({
-                        "name": j_name,
-                        "status": j_status,
-                        "id": j_id,
-                    })
+                config_args = activity.get("configurationArguments", {}) or {}
+                # Check all known locations where email/asset ID can be stored
+                candidate_ids = set()
+
+                # triggeredSend.emailId (classic journey email)
+                ts = config_args.get("triggeredSend") or {}
+                if ts.get("emailId"):
+                    candidate_ids.add(str(ts["emailId"]))
+
+                # Direct assetId field
+                if config_args.get("assetId"):
+                    candidate_ids.add(str(config_args["assetId"]))
+
+                # Direct emailId field
+                if config_args.get("emailId"):
+                    candidate_ids.add(str(config_args["emailId"]))
+
+                # Nested asset object (newer journey format)
+                asset_obj = config_args.get("asset") or {}
+                if asset_obj.get("id"):
+                    candidate_ids.add(str(asset_obj["id"]))
+                if asset_obj.get("itemId"):
+                    candidate_ids.add(str(asset_obj["itemId"]))
+
+                # Check outcomes for referenced assets
+                outcomes = activity.get("outcomes", []) or []
+                for outcome in outcomes:
+                    om = outcome.get("metaData") or {}
+                    if om.get("assetId"):
+                        candidate_ids.add(str(om["assetId"]))
+
+                for cid in candidate_ids:
+                    try:
+                        int_id = int(cid)
+                    except (ValueError, TypeError):
+                        continue
+                    if int_id in asset_id_set:
+                        asset_journeys[int_id].append({
+                            "name": j_name,
+                            "status": j_status,
+                            "id": j_id,
+                        })
+
+        # Deduplicate (a journey might reference same email in multiple activities)
+        for aid in asset_journeys:
+            seen = set()
+            deduped = []
+            for j in asset_journeys[aid]:
+                key = j["id"]
+                if key not in seen:
+                    seen.add(key)
+                    deduped.append(j)
+            asset_journeys[aid] = deduped
 
         return asset_journeys
 
@@ -404,8 +444,13 @@ class SFMCClient:
             cb_ids[str(cb["id"])] = cb["id"]
 
         # Pattern to match ContentBlockByName("..."), ContentBlockById(...), ContentBlockByKey("...")
-        pattern = re.compile(
-            r'ContentBlockBy(Name|Id|Key)\s*\(\s*["\']?([^"\')\s]+)["\']?\s*\)',
+        # Handles quoted strings (with spaces, backslashes for paths) and unquoted numeric IDs
+        pattern_quoted = re.compile(
+            r'ContentBlockBy(Name|Id|Key)\s*\(\s*["\']([^"\']+)["\']',
+            re.IGNORECASE,
+        )
+        pattern_unquoted = re.compile(
+            r'ContentBlockBy(Name|Id|Key)\s*\(\s*([^"\',\)\s]+)',
             re.IGNORECASE,
         )
 
@@ -469,12 +514,19 @@ class SFMCClient:
                     continue
 
                 # Find all ContentBlock references in this email
-                matches = pattern.findall(full_text)
+                matches = pattern_quoted.findall(full_text) + pattern_unquoted.findall(full_text)
                 matched_cb_ids = set()
                 for match_type, match_value in matches:
                     match_type_lower = match_type.lower()
+                    match_value = match_value.strip()
                     if match_type_lower == "name":
+                        # Try full path match first, then just the last segment
+                        # SFMC paths use backslash: "Content Builder\folder\block"
                         cb_id = cb_names_lower.get(match_value.lower())
+                        if not cb_id:
+                            # Extract last segment of path
+                            last_segment = match_value.rsplit("\\", 1)[-1].strip()
+                            cb_id = cb_names_lower.get(last_segment.lower())
                         if cb_id:
                             matched_cb_ids.add(cb_id)
                     elif match_type_lower == "id":
@@ -484,6 +536,9 @@ class SFMCClient:
                     elif match_type_lower == "key":
                         # Key might match name in some cases
                         cb_id = cb_names_lower.get(match_value.lower())
+                        if not cb_id:
+                            last_segment = match_value.rsplit("\\", 1)[-1].strip()
+                            cb_id = cb_names_lower.get(last_segment.lower())
                         if cb_id:
                             matched_cb_ids.add(cb_id)
 

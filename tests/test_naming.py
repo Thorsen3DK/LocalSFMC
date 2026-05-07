@@ -128,6 +128,17 @@ with tempfile.TemporaryDirectory() as tmp:
     assert_eq(idx["1"]["CPR_NUMBER"], "0101019995", "build_naming_index returns row dict")
     assert_eq(idx["3"]["Name"], "Charlie", "build_naming_index trims whitespace from key")
 
+    # Duplicate keys: last row wins
+    dup_csv_path = os.path.join(tmp, "naming_dup.csv")
+    with open(dup_csv_path, "w", encoding="utf-8", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["CUST_ID", "CPR_NUMBER"])
+        w.writerow(["1", "0101010001"])
+        w.writerow(["1", "0202020002"])
+
+    dup_idx = build_naming_index(dup_csv_path, None, "CUST_ID")
+    assert_eq(dup_idx["1"]["CPR_NUMBER"], "0202020002", "build_naming_index duplicate keys: last wins")
+
     # Missing join column → ValueError with column name
     try:
         build_naming_index(csv_path, None, "DOES_NOT_EXIST")

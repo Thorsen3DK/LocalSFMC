@@ -50,9 +50,6 @@ def render_filename(
         return ""
 
     safe = "".join(c if (c.isalnum() or c in "._-") else "_" for c in rendered)
-
-    if not safe:
-        return ""
     return f"{safe}.pdf"
 
 
@@ -80,6 +77,7 @@ def build_naming_index(
 
     For XLSX, `sheet_name` selects the sheet (first sheet if None or unmatched).
     Raises ValueError if `naming_key_col` does not exist in the file's columns.
+    If multiple rows share the same key value, the last row wins.
     """
     if filepath.lower().endswith(".csv"):
         rows = load_csv_file(filepath)

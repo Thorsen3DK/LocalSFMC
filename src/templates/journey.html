@@ -1,0 +1,646 @@
+{% extends "base.html" %}
+{% block title %}LocalSFMC — Journey Names{% endblock %}
+
+{% block head %}
+<style>
+    /* Tabs */
+    .tabs {
+        display: inline-flex;
+        background: var(--bg-secondary);
+        padding: 4px;
+        border-radius: 10px;
+        gap: 2px;
+        margin-bottom: 28px;
+    }
+    .tab-btn {
+        padding: 7px 16px;
+        border: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border-radius: 7px;
+        transition: background .15s, color .15s, box-shadow .15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+        background: var(--bg);
+        color: var(--text);
+        box-shadow: var(--shadow-sm);
+        font-weight: 600;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Generator form */
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 7px;
+        letter-spacing: -0.005em;
+    }
+    .form-group label .required { color: var(--red); margin-left: 2px; }
+    .form-group label .optional {
+        color: var(--text-muted);
+        font-weight: 400;
+        margin-left: 4px;
+    }
+    .form-group select,
+    .form-group input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13.5px;
+        transition: border-color .12s, box-shadow .12s, background .12s;
+    }
+    .form-group select:hover,
+    .form-group input:hover {
+        border-color: var(--text-muted);
+    }
+    .form-group select:focus,
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .form-group.error select,
+    .form-group.error input {
+        border-color: var(--red);
+        background: var(--red-light);
+    }
+    .form-group .error-text {
+        color: var(--red);
+        font-size: 11.5px;
+        margin-top: 6px;
+        display: none;
+    }
+    .form-group.error .error-text { display: block; }
+
+    .form-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* Result */
+    .result-box {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-radius: var(--radius);
+        display: none;
+    }
+    .result-box.success {
+        display: block;
+        background: var(--green-light);
+    }
+    .result-box.error {
+        display: block;
+        background: var(--red-light);
+    }
+    .result-label {
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        letter-spacing: -0.005em;
+    }
+    .result-box.success .result-label { color: var(--green); }
+    .result-box.error .result-label { color: var(--red); }
+    .result-name {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        word-break: break-all;
+        line-height: 1.6;
+        background: rgba(255,255,255,0.5);
+        padding: 10px 12px;
+        border-radius: 8px;
+    }
+
+    /* Lookup */
+    .lookup-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 16px;
+    }
+    .lookup-card { padding: 0; }
+    .lookup-card-header {
+        padding: 14px 16px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+    .lookup-card-header h3 {
+        font-size: 13px;
+        color: var(--text);
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .lookup-locked-badge {
+        font-size: 11px;
+        color: var(--text-muted);
+        background: var(--bg-secondary);
+        padding: 3px 8px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+    .lookup-card-body { padding: 0 16px 16px; }
+
+    .add-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+    .add-row input {
+        flex: 1;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-family: inherit;
+        background: var(--bg-secondary);
+    }
+    .add-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+        background: var(--bg);
+    }
+
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 24px;
+    }
+    .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 4px 10px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-radius: 20px;
+        font-size: 11.5px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+    }
+    .tag.locked {
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+    .tag .remove-tag {
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        opacity: 0.6;
+        transition: opacity .12s;
+    }
+    .tag .remove-tag:hover { opacity: 1; }
+
+    /* History */
+    .history-section { margin-top: 40px; }
+    .history-section h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 14px;
+    }
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th {
+        text-align: left;
+        padding: 12px 18px;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--text-muted);
+        letter-spacing: 0.02em;
+    }
+    .history-table td {
+        padding: 12px 18px;
+        font-size: 13px;
+        border-top: 1px solid var(--border-light);
+        vertical-align: middle;
+    }
+    .history-table tbody tr:hover {
+        background: var(--bg-secondary);
+    }
+    .history-table .journey-name-cell {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        word-break: break-all;
+        color: var(--text);
+    }
+    .empty-history {
+        padding: 56px 20px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13.5px;
+    }
+    .empty-history::before {
+        content: "✦";
+        display: block;
+        font-size: 24px;
+        margin-bottom: 8px;
+        color: var(--bg-tertiary);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Journey Names</h1>
+    <p>Konsistent navngivning af SFMC journeys.</p>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" data-tab="generator">Generator</button>
+    <button class="tab-btn" data-tab="lookup">Lookup-værdier</button>
+</div>
+
+<!-- Generator Tab -->
+<div class="tab-content active" id="tab-generator">
+    <div class="card">
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group" id="fg-campaignType">
+                    <label>Campaign Type <span class="required">*</span></label>
+                    <select id="sel-campaignType"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-campaignTrigger">
+                    <label>Campaign Trigger <span class="required">*</span></label>
+                    <select id="sel-campaignTrigger"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-timing">
+                    <label>Timing <span class="required">*</span></label>
+                    <select id="sel-timing"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-target">
+                    <label>Target <span class="required">*</span></label>
+                    <select id="sel-target"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-year">
+                    <label>Year <span class="required">*</span></label>
+                    <select id="sel-year"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-month">
+                    <label>Month <span class="required">*</span></label>
+                    <select id="sel-month"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-day">
+                    <label>Day <span class="required">*</span></label>
+                    <select id="sel-day"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-identifier">
+                    <label>Identifier <span class="optional">(valgfrit)</span></label>
+                    <input type="text" id="inp-identifier" placeholder="Fx TR11, 628, x...">
+                </div>
+                <div class="form-group" id="fg-description">
+                    <label>Description <span class="required">*</span></label>
+                    <input type="text" id="inp-description" placeholder="Fx 3GSunsetMailTo">
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btn-generate">Generér Journey Name</button>
+            </div>
+
+            <div class="result-box" id="result-box">
+                <div class="result-label" id="result-label"></div>
+                <div class="result-name" id="result-name"></div>
+                <div style="margin-top:10px;">
+                    <button class="btn btn-sm" id="btn-copy" style="display:none;">Kopiér til clipboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <h2>Genererede journey-navne</h2>
+        <div class="card">
+            <table class="history-table" id="history-table">
+                <thead>
+                    <tr>
+                        <th style="width:40px;">#</th>
+                        <th>Journey Name</th>
+                        <th style="width:160px;">Dato</th>
+                        <th style="width:60px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+            <div class="empty-history" id="empty-history">Ingen journeys genereret endnu.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Lookup Tab -->
+<div class="tab-content" id="tab-lookup">
+    <div class="lookup-grid" id="lookup-grid"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const FIELD_LABELS = {
+        campaignType: 'Campaign Type',
+        campaignTrigger: 'Campaign Trigger',
+        timing: 'Timing',
+        target: 'Target',
+        year: 'Year',
+        month: 'Month',
+        day: 'Day',
+    };
+    const LOCKED_FIELDS = ['month', 'day'];
+
+    let lookupData = {};
+
+    async function api(url, options) {
+        options = options || {};
+        const resp = await fetch(url, Object.assign({
+            headers: { 'Content-Type': 'application/json' },
+        }, options));
+        const data = await resp.json();
+        if (!resp.ok) throw Object.assign(new Error('API error'), { status: resp.status }, data);
+        return data;
+    }
+
+    function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+            for (const k in attrs) {
+                if (k === 'class') node.className = attrs[k];
+                else if (k === 'text') node.textContent = attrs[k];
+                else if (k === 'style') node.setAttribute('style', attrs[k]);
+                else if (k.indexOf('data-') === 0) node.setAttribute(k, attrs[k]);
+                else node[k] = attrs[k];
+            }
+        }
+        if (children) {
+            for (const c of children) {
+                if (c == null) continue;
+                node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+            }
+        }
+        return node;
+    }
+
+    function clearChildren(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    // ============ Tabs ============
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            if (btn.dataset.tab === 'generator') populateDropdowns();
+            if (btn.dataset.tab === 'lookup') renderLookup();
+        });
+    });
+
+    // ============ Lookup tab ============
+    async function renderLookup() {
+        const grid = document.getElementById('lookup-grid');
+        lookupData = await api('/journey/api/lookup');
+        clearChildren(grid);
+
+        Object.keys(FIELD_LABELS).forEach(key => {
+            const isLocked = LOCKED_FIELDS.includes(key);
+
+            const card = el('div', { class: 'card lookup-card' });
+
+            // Header
+            const headerRight = isLocked
+                ? el('span', { class: 'lookup-locked-badge', text: 'Låst' })
+                : el('button', { class: 'btn btn-sm', text: 'Gem' });
+            const header = el('div', { class: 'lookup-card-header' }, [
+                el('h3', { text: FIELD_LABELS[key] }),
+                headerRight,
+            ]);
+            card.appendChild(header);
+
+            // Body
+            const body = el('div', { class: 'lookup-card-body' });
+
+            let input = null;
+            if (!isLocked) {
+                input = el('input', { type: 'text', placeholder: 'Tilføj værdi...' });
+                const addBtn = el('button', { class: 'btn btn-sm', text: 'Tilføj' });
+                const addRow = el('div', { class: 'add-row' }, [input, addBtn]);
+                body.appendChild(addRow);
+
+                addBtn.addEventListener('click', () => addValueLocal(key, input, tagsContainer));
+                input.addEventListener('keydown', e => {
+                    if (e.key === 'Enter') addValueLocal(key, input, tagsContainer);
+                });
+                headerRight.addEventListener('click', () => saveLookup(key, headerRight));
+            }
+
+            const tagsContainer = el('div', { class: 'tags-container' });
+            body.appendChild(tagsContainer);
+            card.appendChild(body);
+
+            grid.appendChild(card);
+
+            renderTags(tagsContainer, key, lookupData[key] || [], isLocked);
+        });
+    }
+
+    function renderTags(container, key, items, isLocked) {
+        clearChildren(container);
+        items.forEach((item, idx) => {
+            const tag = el('span', { class: 'tag' + (isLocked ? ' locked' : '') });
+            tag.appendChild(document.createTextNode(item));
+            if (!isLocked) {
+                const remove = el('span', { class: 'remove-tag', text: '×' });
+                remove.addEventListener('click', () => {
+                    lookupData[key].splice(idx, 1);
+                    renderTags(container, key, lookupData[key], false);
+                });
+                tag.appendChild(remove);
+            }
+            container.appendChild(tag);
+        });
+    }
+
+    function addValueLocal(key, input, container) {
+        const val = input.value.trim().toUpperCase();
+        if (!val) return;
+        if (!lookupData[key]) lookupData[key] = [];
+        if (lookupData[key].includes(val)) {
+            input.style.borderColor = 'var(--red)';
+            setTimeout(() => { input.style.borderColor = ''; }, 1200);
+            return;
+        }
+        lookupData[key].push(val);
+        input.value = '';
+        renderTags(container, key, lookupData[key], false);
+    }
+
+    async function saveLookup(key, btn) {
+        const original = btn.textContent;
+        try {
+            const payload = {};
+            payload[key] = lookupData[key];
+            await api('/journey/api/lookup', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            btn.textContent = 'Gemt';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        } catch (err) {
+            btn.textContent = 'Fejl';
+            setTimeout(() => { btn.textContent = original; }, 1500);
+        }
+    }
+
+    // ============ Generator tab ============
+    async function populateDropdowns() {
+        lookupData = await api('/journey/api/lookup');
+        Object.keys(FIELD_LABELS).forEach(key => {
+            const sel = document.getElementById('sel-' + key);
+            if (!sel) return;
+            const current = sel.value;
+            clearChildren(sel);
+            sel.appendChild(el('option', { value: '', text: '— Vælg —' }));
+            (lookupData[key] || []).forEach(v => {
+                sel.appendChild(el('option', { value: v, text: v }));
+            });
+            if (current) sel.value = current;
+        });
+    }
+
+    document.getElementById('btn-generate').addEventListener('click', async () => {
+        const fields = ['campaignType','campaignTrigger','timing','target','year','month','day'];
+        let valid = true;
+
+        document.querySelectorAll('.form-group').forEach(fg => fg.classList.remove('error'));
+
+        const payload = {};
+        fields.forEach(key => {
+            const sel = document.getElementById('sel-' + key);
+            if (!sel.value) {
+                document.getElementById('fg-' + key).classList.add('error');
+                valid = false;
+            }
+            payload[key] = sel.value;
+        });
+
+        const description = document.getElementById('inp-description').value.trim();
+        if (!description) {
+            document.getElementById('fg-description').classList.add('error');
+            valid = false;
+        }
+        payload.description = description;
+        payload.identifier = document.getElementById('inp-identifier').value.trim();
+
+        if (!valid) {
+            showResult('error', 'Udfyld venligst alle påkrævede felter.', '');
+            return;
+        }
+
+        try {
+            const result = await api('/journey/api/generate', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            showResult('success', 'Journey name genereret', result.name);
+            renderHistory();
+        } catch (err) {
+            if (err.status === 409) {
+                showResult('error', 'Duplikat — dette journey name eksisterer allerede', err.name || '');
+            } else {
+                const detail = err.details ? err.details.join(', ') : '';
+                showResult('error', err.error || 'Ukendt fejl', detail);
+            }
+        }
+    });
+
+    function showResult(type, label, name) {
+        const box = document.getElementById('result-box');
+        const copyBtn = document.getElementById('btn-copy');
+        box.className = 'result-box ' + type;
+        document.getElementById('result-label').textContent = label;
+        document.getElementById('result-name').textContent = name;
+        copyBtn.style.display = (type === 'success' && name) ? 'inline-flex' : 'none';
+    }
+
+    document.getElementById('btn-copy').addEventListener('click', () => {
+        const name = document.getElementById('result-name').textContent;
+        if (!name) return;
+        navigator.clipboard.writeText(name).then(() => {
+            const btn = document.getElementById('btn-copy');
+            const original = btn.textContent;
+            btn.textContent = 'Kopieret';
+            setTimeout(() => { btn.textContent = original; }, 1200);
+        });
+    });
+
+    // ============ History ============
+    async function renderHistory() {
+        const history = await api('/journey/api/history');
+        const tbody = document.getElementById('history-body');
+        const emptyMsg = document.getElementById('empty-history');
+        const table = document.getElementById('history-table');
+
+        clearChildren(tbody);
+
+        if (!history.length) {
+            table.style.display = 'none';
+            emptyMsg.style.display = 'block';
+            return;
+        }
+        table.style.display = '';
+        emptyMsg.style.display = 'none';
+
+        history.forEach((item, idx) => {
+            const numTd = el('td', { class: 'text-muted', text: String(idx + 1) });
+            const nameTd = el('td', { class: 'journey-name-cell', text: item.name });
+            const dateTd = el('td', { class: 'text-secondary text-sm', text: item.date });
+            const delBtn = el('button', { class: 'btn btn-sm btn-danger', text: 'Slet' });
+            delBtn.addEventListener('click', async () => {
+                try {
+                    await api('/journey/api/history/' + idx, { method: 'DELETE' });
+                    renderHistory();
+                } catch (err) {
+                    alert('Kunne ikke slette: ' + (err.error || 'Ukendt fejl'));
+                }
+            });
+            const actionTd = el('td', null, [delBtn]);
+            const tr = el('tr', null, [numTd, nameTd, dateTd, actionTd]);
+            tbody.appendChild(tr);
+        });
+    }
+
+    // Init
+    populateDropdowns();
+    renderHistory();
+})();
+</script>
+{% endblock %}

@@ -9,7 +9,9 @@
       "Bash(.venv/Scripts/python.exe *)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://127.0.0.1:5000/)",
       "Bash(curl -sN \"http://127.0.0.1:5000/batch-stream/welcome_email.html?file=test5.csv&sheet=\" --max-time 120)",
-      "Bash(curl -s \"http://127.0.0.1:5000/preview/test.html/raw?file=test2.csv&row=0\")"
+      "Bash(curl -s \"http://127.0.0.1:5000/preview/test.html/raw?file=test2.csv&row=0\")",
+      "Bash(git push *)",
+      "Bash(git add *)"
     ]
   }
 }

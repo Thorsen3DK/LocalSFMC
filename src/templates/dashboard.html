@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}LocalSFMC — Dashboard{% endblock %}
+
+{% block container_class %}container-narrow{% endblock %}
+
+{% block head %}
+<style>
+    .hero {
+        margin-bottom: 40px;
+    }
+    .hero-eyebrow {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--accent);
+        margin-bottom: 12px;
+    }
+    .hero h1 {
+        font-size: 36px;
+        font-weight: 700;
+        letter-spacing: -0.035em;
+        line-height: 1.1;
+    }
+    .hero p {
+        margin-top: 12px;
+        font-size: 15px;
+        color: var(--text-secondary);
+        max-width: 540px;
+        line-height: 1.6;
+    }
+
+    .tool-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+        gap: 16px;
+    }
+
+    .tool-card {
+        position: relative;
+        display: block;
+        background: var(--bg);
+        border-radius: var(--radius-lg);
+        padding: 24px;
+        text-decoration: none;
+        color: var(--text);
+        box-shadow: var(--shadow);
+        transition: box-shadow .18s ease, transform .18s ease;
+        overflow: hidden;
+    }
+    .tool-card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(180deg, rgba(91,91,214,0) 0%, rgba(91,91,214,0.04) 100%);
+        opacity: 0;
+        transition: opacity .18s;
+        pointer-events: none;
+    }
+    .tool-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+        text-decoration: none;
+        color: var(--text);
+    }
+    .tool-card:hover::before { opacity: 1; }
+
+    .tool-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        margin-bottom: 16px;
+        position: relative;
+        z-index: 1;
+    }
+    .tool-icon.purple {
+        background: linear-gradient(135deg, #ecebfa 0%, #d9d8f5 100%);
+        color: #5b5bd6;
+    }
+    .tool-icon.green {
+        background: linear-gradient(135deg, #ecf3ee 0%, #d4e7d9 100%);
+        color: #4f8b5e;
+    }
+    .tool-icon.amber {
+        background: linear-gradient(135deg, #fbf1dc 0%, #f5e0b6 100%);
+        color: #cb912f;
+    }
+
+    .tool-card h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 6px;
+        position: relative;
+        z-index: 1;
+    }
+    .tool-card p {
+        font-size: 13.5px;
+        color: var(--text-secondary);
+        line-height: 1.55;
+        position: relative;
+        z-index: 1;
+    }
+    .tool-arrow {
+        position: absolute;
+        top: 24px;
+        right: 24px;
+        font-size: 16px;
+        color: var(--text-muted);
+        opacity: 0;
+        transform: translateX(-4px);
+        transition: opacity .18s, transform .18s, color .18s;
+    }
+    .tool-card:hover .tool-arrow {
+        opacity: 1;
+        transform: translateX(0);
+        color: var(--accent);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="hero">
+    <div class="hero-eyebrow">Workspace</div>
+    <h1>Hej. Hvad skal vi lave i dag?</h1>
+    <p>Et lokalt værksted til at søge i SFMC, generere journey-navne og rendere email-skabeloner til PDF — uden at trampe i produktionen.</p>
+</section>
+
+<div class="tool-grid">
+    <a href="/search" class="tool-card">
+        <div class="tool-icon purple">⌘</div>
+        <h2>Content Search</h2>
+        <p>Søg i emails og content blocks i SFMC Content Builder. Se journey-tilknytninger og fuldt mapping-spor.</p>
+        <span class="tool-arrow">→</span>
+    </a>
+
+    <a href="/journey" class="tool-card">
+        <div class="tool-icon green">✦</div>
+        <h2>Journey Names</h2>
+        <p>Generér og validér konsistente SFMC journey-navne fra en delt liste af lookup-værdier.</p>
+        <span class="tool-arrow">→</span>
+    </a>
+
+    <a href="/html2pdf" class="tool-card">
+        <div class="tool-icon amber">◇</div>
+        <h2>HTML2PDF</h2>
+        <p>Render HTML emails med AMPScript og eksportér til PDF — enkelt-række eller batch.</p>
+        <span class="tool-arrow">→</span>
+    </a>
+</div>
+{% endblock %}

@@ -1,0 +1,785 @@
+{% extends "base.html" %}
+{% block title %}LocalSFMC — Preview {{ template_name }}{% endblock %}
+
+{% block container_class %}{% endblock %}
+
+{% block head %}
+<style>
+    .preview-page {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 56px);
+    }
+
+    .preview-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 24px;
+        background: var(--bg);
+        box-shadow: var(--shadow-sm);
+        flex-wrap: wrap;
+    }
+    .preview-toolbar .template-name {
+        font-size: 13px;
+        font-weight: 600;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg-secondary);
+        padding: 4px 10px;
+        border-radius: 6px;
+    }
+    .preview-toolbar .divider {
+        width: 1px;
+        height: 22px;
+        background: var(--border);
+    }
+    .preview-toolbar select,
+    .preview-toolbar input[type=number] {
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--bg);
+        font-family: inherit;
+        font-size: 12.5px;
+        color: var(--text);
+        transition: border-color .12s, box-shadow .12s;
+    }
+    .preview-toolbar select:focus,
+    .preview-toolbar input[type=number]:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .preview-toolbar input[type=number] { width: 70px; }
+    .row-info {
+        font-size: 12px;
+        color: var(--text-secondary);
+        font-variant-numeric: tabular-nums;
+    }
+
+    .preview-body {
+        flex: 1;
+        display: grid;
+        grid-template-columns: 1fr 320px;
+        min-height: 0;
+    }
+    .preview-body.no-sidebar { grid-template-columns: 1fr; }
+
+    .iframe-wrap {
+        position: relative;
+        background: var(--bg-secondary);
+        overflow: hidden;
+    }
+    .iframe-wrap iframe {
+        width: 100%;
+        height: 100%;
+        border: 0;
+        background: #fff;
+    }
+    .iframe-empty {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-direction: column;
+        gap: 6px;
+        color: var(--text-muted);
+        font-size: 13px;
+        text-align: center;
+        padding: 20px;
+    }
+    .iframe-empty .label { font-size: 13px; font-weight: 500; }
+    .iframe-empty .hint { font-size: 12px; }
+
+    .sidebar {
+        background: var(--bg);
+        box-shadow: -1px 0 0 var(--border-light);
+        overflow-y: auto;
+        padding: 20px 22px;
+    }
+    .sidebar h3 {
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        color: var(--text-secondary);
+        font-weight: 600;
+        margin-bottom: 10px;
+    }
+    .row-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 12px;
+    }
+    .row-table td {
+        padding: 6px 0;
+        border-bottom: 1px solid var(--border-light);
+        vertical-align: top;
+    }
+    .row-table td.field {
+        color: var(--text-muted);
+        font-weight: 500;
+        padding-right: 12px;
+        width: 40%;
+        word-break: break-word;
+    }
+    .row-table td.value {
+        color: var(--text);
+        word-break: break-word;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    /* Batch export overlay */
+    .batch-overlay {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        width: 360px;
+        max-width: calc(100vw - 40px);
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 6px 24px rgba(0,0,0,0.12);
+        padding: 14px 16px;
+        display: none;
+        z-index: 80;
+    }
+    .batch-overlay.show { display: block; }
+    .batch-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    .batch-header h4 { font-size: 13px; font-weight: 600; }
+    .batch-close {
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        font-size: 18px;
+        line-height: 1;
+        cursor: pointer;
+    }
+    .batch-phase { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+    .progress-bar {
+        height: 6px;
+        background: var(--border-light);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+    .progress-fill {
+        height: 100%;
+        background: var(--accent);
+        width: 0%;
+        transition: width .15s;
+    }
+    .progress-text {
+        font-size: 11px;
+        color: var(--text-muted);
+        margin-top: 6px;
+        font-variant-numeric: tabular-nums;
+    }
+    .batch-files {
+        margin-top: 10px;
+        max-height: 160px;
+        overflow-y: auto;
+        font-size: 11px;
+        color: var(--text-secondary);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    .batch-files div { padding: 2px 0; }
+    .batch-error { color: var(--red); }
+
+    @media (max-width: 880px) {
+        .preview-body { grid-template-columns: 1fr; }
+        .sidebar { border-left: 0; border-top: 1px solid var(--border); max-height: 240px; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="preview-page">
+    <div class="preview-toolbar">
+        <a href="/html2pdf" class="btn btn-sm">← Tilbage</a>
+        <span class="template-name">{{ template_name }}</span>
+
+        <span class="divider"></span>
+
+        <select id="sel-file" data-current="{{ excel_file }}">
+            <option value="">— Vælg datafil —</option>
+        </select>
+        <select id="sel-sheet" data-current="{{ sheet_name }}" style="display:none;">
+            <option value="">— Sheet —</option>
+        </select>
+
+        <span class="divider"></span>
+
+        <button class="btn btn-sm" id="btn-prev" disabled>← Forrige</button>
+        <span class="row-info" id="row-info">{% if total_rows %}Række {{ row_index + 1 }} af {{ total_rows }}{% else %}Ingen data{% endif %}</span>
+        <input type="number" id="row-jump" min="1" value="{{ row_index + 1 }}" {% if not total_rows %}disabled{% endif %}>
+        <button class="btn btn-sm" id="btn-next" disabled>Næste →</button>
+
+        <span style="margin-left:auto; display:flex; gap:8px;">
+            <button class="btn btn-sm" id="btn-pdf" {% if not total_rows %}disabled{% endif %}>Hent PDF</button>
+            <button class="btn btn-sm btn-primary" id="btn-batch" {% if not total_rows %}disabled{% endif %}>Batch eksport</button>
+        </span>
+    </div>
+
+    <div class="preview-toolbar" id="naming-toolbar" style="border-top: 1px solid var(--border-light); padding: 10px 24px; gap: 8px;">
+        <span style="font-size: 12px; font-weight: 600; color: var(--text-secondary); margin-right: 4px;">Filnavngivning</span>
+        <select id="sel-naming-file" disabled>
+            <option value="">— Ingen (standardnavn) —</option>
+        </select>
+        <select id="sel-sender-key" style="display:none;">
+            <option value="">— Sender-kolonne —</option>
+        </select>
+        <select id="sel-naming-key" style="display:none;">
+            <option value="">— Naming-fil kolonne —</option>
+        </select>
+        <input type="text" id="inp-naming-template" placeholder="{{ '{{CPR_NUMBER}}' }}_invoice" style="display:none; flex: 1; min-width: 220px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--text);">
+        <span id="naming-preview" style="display:none; font-size: 11.5px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, monospace; flex-basis: 100%; padding-left: 4px;"></span>
+    </div>
+
+    <div class="preview-body" id="preview-body">
+        <div class="iframe-wrap">
+            <iframe id="preview-frame" title="Email preview"></iframe>
+            <div class="iframe-empty" id="iframe-empty">
+                <div class="label">Vælg en datafil ovenfor</div>
+                <div class="hint">Filen leverer subscriber-rækkerne der renderes i skabelonen.</div>
+            </div>
+        </div>
+        <aside class="sidebar" id="sidebar">
+            <h3>Subscriber-data</h3>
+            <table class="row-table" id="row-table"><tbody></tbody></table>
+        </aside>
+    </div>
+</div>
+
+<div class="batch-overlay" id="batch-overlay">
+    <div class="batch-header">
+        <h4>Batch eksport</h4>
+        <button class="batch-close" id="batch-close" aria-label="Luk">×</button>
+    </div>
+    <div class="batch-phase" id="batch-phase">Initialiserer…</div>
+    <div class="progress-bar"><div class="progress-fill" id="batch-fill"></div></div>
+    <div class="progress-text" id="batch-progress">0 / 0</div>
+    <div class="batch-files" id="batch-files"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script id="preview-data" type="application/json">
+{
+  "templateName": {{ template_name | tojson }},
+  "excelFile": {{ excel_file | tojson }},
+  "sheetName": {{ sheet_name | tojson }},
+  "rowIndex": {{ row_index | tojson }},
+  "totalRows": {{ total_rows | tojson }},
+  "subscriberRow": {{ subscriber_row | tojson }}
+}
+</script>
+<script>
+(function () {
+    const initial = JSON.parse(document.getElementById('preview-data').textContent);
+
+    const selFile = document.getElementById('sel-file');
+    const selSheet = document.getElementById('sel-sheet');
+    const btnPrev = document.getElementById('btn-prev');
+    const btnNext = document.getElementById('btn-next');
+    const btnPdf = document.getElementById('btn-pdf');
+    const btnBatch = document.getElementById('btn-batch');
+    const rowJump = document.getElementById('row-jump');
+    const rowInfo = document.getElementById('row-info');
+    const frame = document.getElementById('preview-frame');
+    const frameEmpty = document.getElementById('iframe-empty');
+    const sidebar = document.getElementById('sidebar');
+    const previewBody = document.getElementById('preview-body');
+    const rowTableBody = document.querySelector('#row-table tbody');
+
+    const selNamingFile = document.getElementById('sel-naming-file');
+    const selSenderKey = document.getElementById('sel-sender-key');
+    const selNamingKey = document.getElementById('sel-naming-key');
+    const inpNamingTemplate = document.getElementById('inp-naming-template');
+    const namingPreview = document.getElementById('naming-preview');
+
+    const overlay = document.getElementById('batch-overlay');
+    const batchClose = document.getElementById('batch-close');
+    const batchPhase = document.getElementById('batch-phase');
+    const batchFill = document.getElementById('batch-fill');
+    const batchProgress = document.getElementById('batch-progress');
+    const batchFiles = document.getElementById('batch-files');
+
+    let state = {
+        excelFile: initial.excelFile || '',
+        sheetName: initial.sheetName || '',
+        rowIndex: initial.rowIndex | 0,
+        totalRows: initial.totalRows | 0,
+        // Naming config
+        namingFile: '',
+        namingSheet: '',
+        senderKey: '',
+        namingKey: '',
+        namingTemplate: '',
+        // Cached columns
+        senderColumns: [],
+        namingColumns: [],
+        currentRowData: null,
+    };
+
+    function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+    function buildPreviewUrl(suffix) {
+        const u = new URL('/preview/' + encodeURIComponent(initial.templateName) + (suffix || ''), window.location.origin);
+        if (state.excelFile) u.searchParams.set('file', state.excelFile);
+        if (state.sheetName) u.searchParams.set('sheet', state.sheetName);
+        u.searchParams.set('row', String(state.rowIndex));
+        // Apply naming params only to the /pdf suffix — not to /raw (which renders HTML).
+        if (suffix === '/pdf') appendNamingParams(u);
+        return u.toString();
+    }
+
+    function updateFrame() {
+        if (!state.excelFile || !state.totalRows) {
+            frame.src = 'about:blank';
+            frameEmpty.style.display = 'flex';
+            previewBody.classList.add('no-sidebar');
+            sidebar.style.display = 'none';
+            return;
+        }
+        frameEmpty.style.display = 'none';
+        previewBody.classList.remove('no-sidebar');
+        sidebar.style.display = '';
+        frame.src = buildPreviewUrl('/raw');
+    }
+
+    function updateControls() {
+        const has = state.totalRows > 0;
+        btnPrev.disabled = !has || state.rowIndex <= 0;
+        btnNext.disabled = !has || state.rowIndex >= state.totalRows - 1;
+        btnPdf.disabled = !has;
+        btnBatch.disabled = !has;
+        rowJump.disabled = !has;
+        rowJump.max = String(Math.max(1, state.totalRows));
+        rowJump.value = String(state.rowIndex + 1);
+        rowInfo.textContent = has
+            ? `Række ${state.rowIndex + 1} af ${state.totalRows}`
+            : 'Ingen data';
+    }
+
+    function pushHistory() {
+        const url = new URL(window.location.href);
+        url.searchParams.set('file', state.excelFile);
+        if (state.sheetName) url.searchParams.set('sheet', state.sheetName);
+        else url.searchParams.delete('sheet');
+        url.searchParams.set('row', String(state.rowIndex));
+        history.replaceState(null, '', url.toString());
+    }
+
+    async function loadDataFiles() {
+        const resp = await fetch('/upload/files');
+        const data = await resp.json();
+        // Only sender DEs are valid send-list sources. Mapping DEs are lookup
+        // tables and shouldn't show up in the data-source picker.
+        const files = (data.sender_files || []).slice();
+        clearChildren(selFile);
+        selFile.appendChild(el('option', { value: '', text: '— Vælg sender DE —' }));
+        files.forEach(f => selFile.appendChild(el('option', { value: f, text: f })));
+        if (state.excelFile && !files.includes(state.excelFile)) {
+            // Preserve a previously-bookmarked file even if it's now classified
+            // as mapping, so the URL still works.
+            selFile.appendChild(el('option', { value: state.excelFile, text: state.excelFile + '  (mapping)' }));
+        }
+        if (state.excelFile) selFile.value = state.excelFile;
+        await onFileChange(false);
+    }
+
+    function el(tag, attrs) {
+        const node = document.createElement(tag);
+        if (attrs) for (const k in attrs) {
+            if (k === 'text') node.textContent = attrs[k];
+            else node[k] = attrs[k];
+        }
+        return node;
+    }
+
+    async function onFileChange(resetRow) {
+        const file = selFile.value;
+        state.excelFile = file;
+        if (!file) {
+            selSheet.style.display = 'none';
+            state.sheetName = '';
+            state.totalRows = 0;
+            state.rowIndex = 0;
+            updateControls();
+            updateFrame();
+            return;
+        }
+        const sheets = await fetchSheets(file);
+        const isMultiSheet = sheets.length > 1 || (sheets.length === 1 && sheets[0].name);
+        if (isMultiSheet) {
+            clearChildren(selSheet);
+            sheets.forEach(s => {
+                const opt = el('option', {
+                    value: s.name,
+                    text: s.name ? `${s.name} (${s.rows} rækker)` : `(${s.rows} rækker)`,
+                });
+                selSheet.appendChild(opt);
+            });
+            selSheet.style.display = '';
+            if (state.sheetName && sheets.some(s => s.name === state.sheetName)) {
+                selSheet.value = state.sheetName;
+            } else {
+                selSheet.value = sheets[0].name;
+                state.sheetName = sheets[0].name;
+            }
+        } else {
+            selSheet.style.display = 'none';
+            state.sheetName = '';
+        }
+        const match = sheets.find(s => s.name === state.sheetName) || sheets[0];
+        state.totalRows = match ? match.rows : 0;
+        if (resetRow) state.rowIndex = 0;
+        else state.rowIndex = Math.max(0, Math.min(state.rowIndex, state.totalRows - 1));
+        updateControls();
+        updateFrame();
+        pushHistory();
+        await refreshSenderColumns();
+    }
+
+    async function fetchSheets(file) {
+        const resp = await fetch('/sheets?file=' + encodeURIComponent(file));
+        return resp.ok ? resp.json() : [];
+    }
+
+    function buildSubscriberUrl(row) {
+        const u = new URL('/subscriber_data', window.location.origin);
+        u.searchParams.set('file', state.excelFile);
+        if (state.sheetName) u.searchParams.set('sheet', state.sheetName);
+        u.searchParams.set('row', String(row));
+        return u.toString();
+    }
+
+    async function loadSubscriberRow() {
+        if (!state.excelFile || !state.totalRows) {
+            clearChildren(rowTableBody);
+            state.currentRowData = null;
+            updateNamingPreview();
+            return;
+        }
+        const resp = await fetch(buildSubscriberUrl(state.rowIndex));
+        const row = resp.ok ? await resp.json() : {};
+        state.currentRowData = row;
+        renderSubscriberRow(row);
+        updateNamingPreview();
+    }
+
+    function renderSubscriberRow(row) {
+        clearChildren(rowTableBody);
+        const keys = Object.keys(row || {});
+        if (!keys.length) {
+            const tr = document.createElement('tr');
+            const td = document.createElement('td');
+            td.colSpan = 2;
+            td.style.color = 'var(--text-muted)';
+            td.style.fontStyle = 'italic';
+            td.textContent = 'Ingen data';
+            tr.appendChild(td);
+            rowTableBody.appendChild(tr);
+            return;
+        }
+        keys.forEach(k => {
+            const tr = document.createElement('tr');
+            const tdK = document.createElement('td');
+            tdK.className = 'field';
+            tdK.textContent = k;
+            const tdV = document.createElement('td');
+            tdV.className = 'value';
+            const v = row[k];
+            tdV.textContent = v == null || v === '' ? '—' : String(v);
+            tr.appendChild(tdK);
+            tr.appendChild(tdV);
+            rowTableBody.appendChild(tr);
+        });
+    }
+
+    async function gotoRow(idx) {
+        if (!state.totalRows) return;
+        state.rowIndex = Math.max(0, Math.min(idx, state.totalRows - 1));
+        updateControls();
+        updateFrame();
+        pushHistory();
+        await loadSubscriberRow();
+    }
+
+    selFile.addEventListener('change', () => onFileChange(true).then(loadSubscriberRow));
+    selSheet.addEventListener('change', async () => {
+        state.sheetName = selSheet.value;
+        const sheets = await fetchSheets(state.excelFile);
+        const match = sheets.find(s => s.name === state.sheetName) || sheets[0];
+        state.totalRows = match ? match.rows : 0;
+        state.rowIndex = 0;
+        updateControls();
+        updateFrame();
+        pushHistory();
+        await loadSubscriberRow();
+    });
+
+    btnPrev.addEventListener('click', () => gotoRow(state.rowIndex - 1));
+    btnNext.addEventListener('click', () => gotoRow(state.rowIndex + 1));
+    rowJump.addEventListener('change', () => {
+        const n = parseInt(rowJump.value, 10);
+        if (!isNaN(n)) gotoRow(n - 1);
+    });
+    btnPdf.addEventListener('click', () => {
+        if (!state.totalRows) return;
+        window.location.href = buildPreviewUrl('/pdf');
+    });
+
+    // ============ Batch export ============
+    let evtSource = null;
+    btnBatch.addEventListener('click', () => {
+        if (!state.totalRows) return;
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        startBatch();
+    });
+    batchClose.addEventListener('click', () => {
+        if (evtSource) { evtSource.close(); evtSource = null; }
+        overlay.classList.remove('show');
+    });
+
+    function startBatch() {
+        clearChildren(batchFiles);
+        batchFill.style.width = '0%';
+        batchPhase.textContent = 'Forbinder…';
+        batchProgress.textContent = '0 / 0';
+        overlay.classList.add('show');
+
+        const u = new URL('/batch-stream/' + encodeURIComponent(initial.templateName), window.location.origin);
+        u.searchParams.set('file', state.excelFile);
+        if (state.sheetName) u.searchParams.set('sheet', state.sheetName);
+        appendNamingParams(u);
+        evtSource = new EventSource(u.toString());
+
+        evtSource.onmessage = (e) => {
+            let msg;
+            try { msg = JSON.parse(e.data); } catch (_) { return; }
+            if (msg.type === 'start') {
+                batchPhase.textContent = 'Starter render af ' + msg.total + ' rækker…';
+                batchProgress.textContent = '0 / ' + msg.total;
+            } else if (msg.type === 'phase') {
+                batchPhase.textContent = msg.message;
+            } else if (msg.type === 'row') {
+                const pct = Math.round((msg.index / msg.total) * 100);
+                batchFill.style.width = pct + '%';
+                batchProgress.textContent = `${msg.index} / ${msg.total}`;
+                const line = document.createElement('div');
+                line.textContent = msg.filename + (msg.identifier ? '  · ' + msg.identifier : '');
+                batchFiles.appendChild(line);
+                batchFiles.scrollTop = batchFiles.scrollHeight;
+            } else if (msg.type === 'done') {
+                batchPhase.textContent = 'Færdig — ' + msg.total + ' filer eksporteret.';
+                batchFill.style.width = '100%';
+                if (evtSource) { evtSource.close(); evtSource = null; }
+            } else if (msg.type === 'error') {
+                batchPhase.textContent = 'Fejl';
+                const line = document.createElement('div');
+                line.className = 'batch-error';
+                line.textContent = msg.message;
+                batchFiles.appendChild(line);
+                if (evtSource) { evtSource.close(); evtSource = null; }
+            }
+        };
+        evtSource.onerror = () => {
+            batchPhase.textContent = 'Forbindelse afbrudt';
+            if (evtSource) { evtSource.close(); evtSource = null; }
+        };
+    }
+
+    // ============ Naming config ============
+    const NAMING_LS_KEY = 'localsfmc:naming:' + initial.templateName;
+
+    function loadNamingFromStorage() {
+        try {
+            const raw = localStorage.getItem(NAMING_LS_KEY);
+            if (!raw) return null;
+            return JSON.parse(raw);
+        } catch (_) { return null; }
+    }
+
+    function saveNamingToStorage() {
+        const payload = {
+            namingFile: state.namingFile,
+            namingSheet: state.namingSheet,
+            senderKey: state.senderKey,
+            namingKey: state.namingKey,
+            namingTemplate: state.namingTemplate,
+        };
+        try { localStorage.setItem(NAMING_LS_KEY, JSON.stringify(payload)); } catch (_) {}
+    }
+
+    async function fetchColumns(file, sheet) {
+        if (!file) return [];
+        const u = new URL('/columns', window.location.origin);
+        u.searchParams.set('file', file);
+        if (sheet) u.searchParams.set('sheet', sheet);
+        const resp = await fetch(u.toString());
+        return resp.ok ? resp.json() : [];
+    }
+
+    function populateSelect(sel, options, currentValue, placeholder) {
+        clearChildren(sel);
+        sel.appendChild(el('option', { value: '', text: placeholder }));
+        options.forEach(opt => sel.appendChild(el('option', { value: opt, text: opt })));
+        if (currentValue && options.includes(currentValue)) sel.value = currentValue;
+        else sel.value = '';
+    }
+
+    async function refreshNamingFiles() {
+        const resp = await fetch('/upload/files');
+        const data = await resp.json();
+        const files = data.naming_files || [];
+        clearChildren(selNamingFile);
+        selNamingFile.appendChild(el('option', { value: '', text: '— Ingen (standardnavn) —' }));
+        files.forEach(f => selNamingFile.appendChild(el('option', { value: f, text: f })));
+        selNamingFile.disabled = files.length === 0 && !state.namingFile;
+        if (state.namingFile && files.includes(state.namingFile)) selNamingFile.value = state.namingFile;
+    }
+
+    async function refreshSenderColumns() {
+        if (!state.excelFile) {
+            state.senderColumns = [];
+            populateSelect(selSenderKey, [], '', '— Sender-kolonne —');
+            return;
+        }
+        state.senderColumns = await fetchColumns(state.excelFile, state.sheetName);
+        populateSelect(selSenderKey, state.senderColumns, state.senderKey, '— Sender-kolonne —');
+    }
+
+    async function refreshNamingColumns() {
+        if (!state.namingFile) {
+            state.namingColumns = [];
+            populateSelect(selNamingKey, [], '', '— Naming-fil kolonne —');
+            return;
+        }
+        state.namingColumns = await fetchColumns(state.namingFile, state.namingSheet);
+        populateSelect(selNamingKey, state.namingColumns, state.namingKey, '— Naming-fil kolonne —');
+    }
+
+    function namingConfigured() {
+        return Boolean(state.namingFile && state.senderKey && state.namingKey && state.namingTemplate);
+    }
+
+    function namingParams() {
+        if (!namingConfigured()) return null;
+        return {
+            naming_file: state.namingFile,
+            naming_sheet: state.namingSheet,
+            sender_key: state.senderKey,
+            naming_key: state.namingKey,
+            naming_template: state.namingTemplate,
+        };
+    }
+
+    function appendNamingParams(url) {
+        const p = namingParams();
+        if (!p) return;
+        for (const [k, v] of Object.entries(p)) {
+            if (v) url.searchParams.set(k, v);
+        }
+    }
+
+    function setNamingVisibility() {
+        const has = Boolean(state.namingFile);
+        selSenderKey.style.display = has ? '' : 'none';
+        selNamingKey.style.display = has ? '' : 'none';
+        inpNamingTemplate.style.display = has ? '' : 'none';
+        namingPreview.style.display = has ? '' : 'none';
+    }
+
+    function renderTemplateLocally(template, senderRow, lookupRow) {
+        // Mirror the server's render_filename for live preview only.
+        const merged = Object.assign({}, senderRow || {}, lookupRow || {});
+        let s = String(template || '').replace(/\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g, (_, k) => {
+            const v = merged[k];
+            return v == null ? '' : String(v);
+        });
+        if (/\.pdf$/i.test(s)) s = s.slice(0, -4);
+        s = Array.from(s).map(c => /[A-Za-z0-9._-]/.test(c) ? c : '_').join('');
+        s = s.replace(/^_+|_+$/g, '').trim();
+        return s ? s + '.pdf' : '';
+    }
+
+    async function updateNamingPreview() {
+        if (!namingConfigured() || !state.currentRowData) {
+            namingPreview.textContent = '';
+            return;
+        }
+        const senderRow = state.currentRowData;
+        const key = senderRow[state.senderKey];
+        if (key === undefined || key === null || key === '') {
+            namingPreview.textContent = '(ingen sender-værdi for ' + state.senderKey + ')';
+            return;
+        }
+        // Local preview only — uses the sender value as a stand-in for the lookup
+        // value. The actual filename is computed server-side at export time using
+        // the real lookup row.
+        const fakeLookup = {};
+        fakeLookup[state.namingKey] = String(key).trim();
+        const rendered = renderTemplateLocally(state.namingTemplate, senderRow, fakeLookup);
+        namingPreview.textContent = rendered
+            ? 'Eksempel: ' + rendered + '  (faktisk navn afhænger af lookup-rækken)'
+            : '(skabelon tom)';
+    }
+
+    selNamingFile.addEventListener('change', async () => {
+        state.namingFile = selNamingFile.value;
+        state.namingKey = '';  // reset on file change
+        setNamingVisibility();
+        await refreshNamingColumns();
+        saveNamingToStorage();
+        updateNamingPreview();
+    });
+    selSenderKey.addEventListener('change', () => {
+        state.senderKey = selSenderKey.value;
+        saveNamingToStorage();
+        updateNamingPreview();
+    });
+    selNamingKey.addEventListener('change', () => {
+        state.namingKey = selNamingKey.value;
+        saveNamingToStorage();
+        updateNamingPreview();
+    });
+    inpNamingTemplate.addEventListener('input', () => {
+        state.namingTemplate = inpNamingTemplate.value;
+        saveNamingToStorage();
+        updateNamingPreview();
+    });
+
+    // ============ Init ============
+    if (initial.subscriberRow) {
+        state.currentRowData = initial.subscriberRow;
+        renderSubscriberRow(initial.subscriberRow);
+    }
+
+    const stored = loadNamingFromStorage();
+    if (stored) {
+        state.namingFile = stored.namingFile || '';
+        state.namingSheet = stored.namingSheet || '';
+        state.senderKey = stored.senderKey || '';
+        state.namingKey = stored.namingKey || '';
+        state.namingTemplate = stored.namingTemplate || '';
+        if (state.namingTemplate) inpNamingTemplate.value = state.namingTemplate;
+    }
+
+    Promise.all([loadDataFiles(), refreshNamingFiles()]).then(async () => {
+        updateControls();
+        updateFrame();
+        await refreshSenderColumns();
+        await refreshNamingColumns();
+        setNamingVisibility();
+        if (state.totalRows && !initial.subscriberRow) await loadSubscriberRow();
+        updateNamingPreview();
+    });
+})();
+</script>
+{% endblock %}

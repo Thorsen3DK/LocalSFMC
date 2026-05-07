@@ -192,18 +192,23 @@
     .tag {
         display: inline-flex;
         align-items: center;
+        justify-content: center;
         gap: 5px;
-        padding: 4px 10px;
+        padding: 6px 12px;
         background: var(--accent-light);
         color: var(--accent);
         border-radius: 20px;
         font-size: 11.5px;
         font-weight: 500;
         letter-spacing: 0.01em;
+        white-space: nowrap;
     }
     .tag.locked {
         background: var(--bg-secondary);
         color: var(--text-secondary);
+        min-width: 42px;
+        justify-content: center;
+        font-variant-numeric: tabular-nums;
     }
     .tag .remove-tag {
         cursor: pointer;
@@ -438,7 +443,7 @@
             // Header
             const headerRight = isLocked
                 ? el('span', { class: 'lookup-locked-badge', text: 'Låst' })
-                : el('button', { class: 'btn btn-sm', text: 'Gem' });
+                : null;
             const header = el('div', { class: 'lookup-card-header' }, [
                 el('h3', { text: FIELD_LABELS[key] }),
                 headerRight,
@@ -451,15 +456,15 @@
             let input = null;
             if (!isLocked) {
                 input = el('input', { type: 'text', placeholder: 'Tilføj værdi...' });
-                const addBtn = el('button', { class: 'btn btn-sm', text: 'Tilføj' });
-                const addRow = el('div', { class: 'add-row' }, [input, addBtn]);
+                const addRow = el('div', { class: 'add-row' }, [input]);
                 body.appendChild(addRow);
 
-                addBtn.addEventListener('click', () => addValueLocal(key, input, tagsContainer));
-                input.addEventListener('keydown', e => {
-                    if (e.key === 'Enter') addValueLocal(key, input, tagsContainer);
+                input.addEventListener('keydown', async e => {
+                    if (e.key === 'Enter') {
+                        addValueLocal(key, input, tagsContainer);
+                        await saveLookup(key);
+                    }
                 });
-                headerRight.addEventListener('click', () => saveLookup(key, headerRight));
             }
 
             const tagsContainer = el('div', { class: 'tags-container' });
@@ -479,9 +484,10 @@
             tag.appendChild(document.createTextNode(item));
             if (!isLocked) {
                 const remove = el('span', { class: 'remove-tag', text: '×' });
-                remove.addEventListener('click', () => {
+                remove.addEventListener('click', async () => {
                     lookupData[key].splice(idx, 1);
                     renderTags(container, key, lookupData[key], false);
+                    await saveLookup(key);
                 });
                 tag.appendChild(remove);
             }
@@ -503,8 +509,7 @@
         renderTags(container, key, lookupData[key], false);
     }
 
-    async function saveLookup(key, btn) {
-        const original = btn.textContent;
+    async function saveLookup(key) {
         try {
             const payload = {};
             payload[key] = lookupData[key];
@@ -512,11 +517,8 @@
                 method: 'POST',
                 body: JSON.stringify(payload),
             });
-            btn.textContent = 'Gemt';
-            setTimeout(() => { btn.textContent = original; }, 1200);
         } catch (err) {
-            btn.textContent = 'Fejl';
-            setTimeout(() => { btn.textContent = original; }, 1500);
+            // silent
         }
     }
 

@@ -249,6 +249,14 @@ def batch_export_stream(template_name: str):
 
     all_des = load_all(de_dir())
 
+    try:
+        naming = _read_naming_params()
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    if naming is not None and send_list and naming["sender_key"] not in send_list[0]:
+        return jsonify({"error": f"Sender column not found: {naming['sender_key']}"}), 400
+
     with open(template_path, "r", encoding="utf-8") as f:
         template_source = f.read()
 
@@ -257,7 +265,38 @@ def batch_export_stream(template_name: str):
     base_name = Path(template_name).stem
     total = len(send_list)
 
+    # Pre-compute which rows have a naming-file match so the progress bar
+    # reflects total_eligible, not total raw rows.
+    if naming is not None:
+        skipped_indices = []
+        eligible_indices = []
+        for i, row in enumerate(send_list):
+            key = str(row.get(naming["sender_key"], "")).strip()
+            if key and key in naming["index"]:
+                eligible_indices.append(i)
+            else:
+                skipped_indices.append((i, key))
+        total_eligible = len(eligible_indices)
+    else:
+        skipped_indices = []
+        eligible_indices = list(range(total))
+        total_eligible = total
+
+    used_filenames: set = set()
+
     def _row_filename(idx: int, subscriber_row: Dict[str, Any]) -> tuple:
+        """Return (filename, identifier_for_progress_log)."""
+        if naming is not None:
+            key = str(subscriber_row.get(naming["sender_key"], "")).strip()
+            lookup = naming["index"].get(key)
+            # Caller ensures we only land here for eligible rows.
+            rendered = render_filename(naming["template"], subscriber_row, lookup or {})
+            if not rendered:
+                rendered = f"{base_name}_{idx+1}.pdf"
+            final = disambiguate(rendered, used_filenames)
+            used_filenames.add(final)
+            return final, key
+
         row_lower = {k.lower(): v for k, v in subscriber_row.items()}
         identifier = (
             row_lower.get("email")
@@ -266,8 +305,12 @@ def batch_export_stream(template_name: str):
         )
         if identifier:
             safe_id = "".join(c if c.isalnum() or c in "._-" else "_" for c in str(identifier))
-            return f"{base_name}_{idx+1}_{safe_id}.pdf", str(identifier)
-        return f"{base_name}_{idx+1}.pdf", ""
+            base_filename = f"{base_name}_{idx+1}_{safe_id}.pdf"
+        else:
+            base_filename = f"{base_name}_{idx+1}.pdf"
+        final = disambiguate(base_filename, used_filenames)
+        used_filenames.add(final)
+        return final, str(identifier or "")
 
     def generate():
         from playwright.async_api import async_playwright
@@ -284,12 +327,21 @@ def batch_export_stream(template_name: str):
 
                         msg_q.put(("phase", f"Rendering HTML for {total} rows..."))
                         html_items = []
+                        eligible_set = set(eligible_indices)
                         for i, rendered_html in render_batch_stream(
                             template_source=template_source,
                             send_list=send_list,
                             data_extensions=all_des,
                             content_block_loader=content_block_loader,
                         ):
+                            if i not in eligible_set:
+                                # Skipped — surface to the client; no PDF will be rendered.
+                                skip_key = next(
+                                    (k for (idx_, k) in skipped_indices if idx_ == i),
+                                    "",
+                                )
+                                msg_q.put(("skip", i, skip_key))
+                                continue
                             out_name, identifier = _row_filename(i, send_list[i])
                             html_items.append((out_name, identifier, rendered_html))
 
@@ -368,7 +420,7 @@ def batch_export_stream(template_name: str):
 
         threading.Thread(target=worker, daemon=True).start()
 
-        yield f"data: {json.dumps({'type': 'start', 'total': total, 'template': template_name, 'file': excel_file})}\n\n"
+        yield f"data: {json.dumps({'type': 'start', 'total': total_eligible, 'total_raw': total, 'skipped_total': len(skipped_indices), 'template': template_name, 'file': excel_file})}\n\n"
 
         while True:
             try:
@@ -379,11 +431,14 @@ def batch_export_stream(template_name: str):
             kind = msg[0]
             if kind == "phase":
                 yield f"data: {json.dumps({'type': 'phase', 'message': msg[1]})}\n\n"
+            elif kind == "skip":
+                _, idx, key = msg
+                yield f"data: {json.dumps({'type': 'skip', 'index': idx, 'key': key})}\n\n"
             elif kind == "row":
                 _, index, out_name, identifier = msg
                 yield f"data: {json.dumps({'type': 'row', 'index': index, 'total': total, 'filename': out_name, 'identifier': identifier})}\n\n"
             elif kind == "done":
-                yield f"data: {json.dumps({'type': 'done', 'total': total})}\n\n"
+                yield f"data: {json.dumps({'type': 'done', 'total': total_eligible, 'skipped_total': len(skipped_indices)})}\n\n"
                 break
             elif kind == "error":
                 yield f"data: {json.dumps({'type': 'error', 'message': msg[1]})}\n\n"

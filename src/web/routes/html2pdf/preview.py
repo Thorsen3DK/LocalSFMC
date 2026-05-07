@@ -31,6 +31,37 @@ def _list_templates():
     return sorted(f.name for f in edir.glob("*.html"))
 
 
+from web.services.naming import build_naming_index, render_filename, disambiguate
+
+
+def _read_naming_params():
+    """Pull naming params off the current request. Returns dict or None.
+
+    None means naming is not configured (template/single-row should fall back
+    to default behavior). Raises ValueError if params reference a missing file
+    or a missing column — caller turns that into a 400.
+    """
+    naming_file = request.args.get("naming_file", "").strip()
+    sender_key = request.args.get("sender_key", "").strip()
+    naming_key = request.args.get("naming_key", "").strip()
+    template = request.args.get("naming_template", "").strip()
+    if not (naming_file and sender_key and naming_key and template):
+        return None
+
+    filepath = os.path.join(de_dir(), naming_file)
+    if not os.path.isfile(filepath):
+        raise ValueError(f"Naming file not found: {naming_file}")
+
+    sheet = request.args.get("naming_sheet", "").strip() or None
+    index = build_naming_index(filepath, sheet, naming_key)
+
+    return {
+        "index": index,
+        "sender_key": sender_key,
+        "template": template,
+    }
+
+
 @bp.route("/preview/<template_name>")
 def preview(template_name: str):
     """Preview UI — picks a data file/sheet and renders rows in an iframe.
@@ -143,7 +174,23 @@ def preview_pdf(template_name: str):
 
     pdf_bytes = html_to_pdf(rendered_html)
     base_name = Path(template_name).stem
+
+    # Determine filename: naming-config wins when configured.
+    try:
+        naming = _read_naming_params()
+    except ValueError as e:
+        return str(e), 400
+
     filename = f"{base_name}_row{row_index + 1}.pdf"
+    if naming is not None:
+        if naming["sender_key"] not in subscriber_row:
+            return f"Sender column not found: {naming['sender_key']}", 400
+        key = str(subscriber_row.get(naming["sender_key"], "")).strip()
+        lookup = naming["index"].get(key) if key else None
+        if lookup is not None:
+            rendered = render_filename(naming["template"], subscriber_row, lookup)
+            if rendered:
+                filename = rendered
 
     response = make_response(pdf_bytes)
     response.headers["Content-Type"] = "application/pdf"

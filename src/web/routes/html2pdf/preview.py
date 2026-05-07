@@ -20,6 +20,7 @@ from ampscript.interpreter import render as ampscript_render, render_batch_strea
 from data.excel_loader import get_send_list, load_all
 from web.routes import bp
 from web.services.content_blocks import content_block_loader, emails_dir, de_dir, output_dir
+from web.services.naming import build_naming_index, render_filename, disambiguate
 from web.services.pdf import html_to_pdf
 
 
@@ -29,9 +30,6 @@ def _list_templates():
     if not edir.is_dir():
         return []
     return sorted(f.name for f in edir.glob("*.html"))
-
-
-from web.services.naming import build_naming_index, render_filename, disambiguate
 
 
 def _read_naming_params():
@@ -160,8 +158,27 @@ def preview_pdf(template_name: str):
 
     row_index = max(0, min(row_index, len(send_list) - 1))
     subscriber_row = send_list[row_index]
-    all_des = load_all(de_dir())
 
+    # Resolve the output filename before doing any expensive rendering, so
+    # bad naming params fail fast.
+    base_name = Path(template_name).stem
+    try:
+        naming = _read_naming_params()
+    except ValueError as e:
+        return str(e), 400
+
+    filename = f"{base_name}_row{row_index + 1}.pdf"
+    if naming is not None:
+        if naming["sender_key"] not in subscriber_row:
+            return f"Sender column not found: {naming['sender_key']}", 400
+        key = str(subscriber_row[naming["sender_key"]]).strip()
+        lookup = naming["index"].get(key) if key else None
+        if lookup is not None:
+            rendered = render_filename(naming["template"], subscriber_row, lookup)
+            if rendered:
+                filename = rendered
+
+    all_des = load_all(de_dir())
     with open(template_path, "r", encoding="utf-8") as f:
         template_source = f.read()
 
@@ -173,24 +190,6 @@ def preview_pdf(template_name: str):
     )
 
     pdf_bytes = html_to_pdf(rendered_html)
-    base_name = Path(template_name).stem
-
-    # Determine filename: naming-config wins when configured.
-    try:
-        naming = _read_naming_params()
-    except ValueError as e:
-        return str(e), 400
-
-    filename = f"{base_name}_row{row_index + 1}.pdf"
-    if naming is not None:
-        if naming["sender_key"] not in subscriber_row:
-            return f"Sender column not found: {naming['sender_key']}", 400
-        key = str(subscriber_row.get(naming["sender_key"], "")).strip()
-        lookup = naming["index"].get(key) if key else None
-        if lookup is not None:
-            rendered = render_filename(naming["template"], subscriber_row, lookup)
-            if rendered:
-                filename = rendered
 
     response = make_response(pdf_bytes)
     response.headers["Content-Type"] = "application/pdf"

@@ -194,6 +194,54 @@
         .preview-body { grid-template-columns: 1fr; }
         .sidebar { border-left: 0; border-top: 1px solid var(--border); max-height: 240px; }
     }
+
+    /* Naming template autocomplete */
+    .naming-ac {
+        position: absolute;
+        display: none;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        box-shadow: var(--shadow-md);
+        max-height: 260px;
+        overflow-y: auto;
+        z-index: 100;
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+        min-width: 220px;
+    }
+    .naming-ac.show { display: block; }
+    .naming-ac-item {
+        padding: 7px 12px;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        color: var(--text);
+    }
+    .naming-ac-item:hover,
+    .naming-ac-item.active {
+        background: var(--accent-light);
+        color: var(--accent);
+    }
+    .naming-ac-source {
+        font-size: 10px;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        font-weight: 600;
+        font-family: 'Inter', sans-serif;
+    }
+    .naming-ac-item.active .naming-ac-source {
+        color: var(--accent);
+        opacity: 0.8;
+    }
+    .naming-ac-empty {
+        padding: 10px 12px;
+        color: var(--text-muted);
+        font-style: italic;
+    }
 </style>
 {% endblock %}
 
@@ -239,6 +287,8 @@
         <input type="text" id="inp-naming-template" placeholder="{{ '{{CPR_NUMBER}}' }}_invoice" style="display:none; flex: 1; min-width: 220px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--text);">
         <span id="naming-preview" style="display:none; font-size: 11.5px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, monospace; flex-basis: 100%; padding-left: 4px;"></span>
     </div>
+
+    <div id="naming-autocomplete" class="naming-ac"></div>
 
     <div class="preview-body" id="preview-body">
         <div class="iframe-wrap">
@@ -301,6 +351,7 @@
     const selNamingKey = document.getElementById('sel-naming-key');
     const inpNamingTemplate = document.getElementById('inp-naming-template');
     const namingPreview = document.getElementById('naming-preview');
+    const namingAc = document.getElementById('naming-autocomplete');
 
     const overlay = document.getElementById('batch-overlay');
     const batchClose = document.getElementById('batch-close');
@@ -325,6 +376,9 @@
         namingColumns: [],
         currentRowData: null,
         currentLookupRow: null,
+        // Autocomplete
+        autocompleteMatches: [],
+        autocompleteIndex: 0,
     };
 
     function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
@@ -801,7 +855,140 @@
         state.namingTemplate = inpNamingTemplate.value;
         saveNamingToStorage();
         updateNamingPreview();
+        showFieldAutocomplete();
     });
+    inpNamingTemplate.addEventListener('keydown', onAutocompleteKeydown);
+    inpNamingTemplate.addEventListener('blur', () => {
+        // Delay so a mousedown on a dropdown item registers first.
+        setTimeout(hideFieldAutocomplete, 150);
+    });
+    inpNamingTemplate.addEventListener('focus', showFieldAutocomplete);
+
+    // ============ Field autocomplete ============
+    function getAutocompleteContext() {
+        const value = inpNamingTemplate.value;
+        const cursor = inpNamingTemplate.selectionStart;
+        if (cursor == null) return null;
+        const before = value.slice(0, cursor);
+        const lastOpen = before.lastIndexOf('{{');
+        if (lastOpen === -1) return null;
+        const after = before.slice(lastOpen + 2);
+        // Cancel if a `}}` already closed the placeholder before the cursor.
+        if (after.includes('}}')) return null;
+        // Only show when the prefix is empty or alphanumeric/underscore.
+        if (!/^[A-Za-z0-9_]*$/.test(after)) return null;
+        return { start: lastOpen, prefix: after };
+    }
+
+    function getAvailableFields() {
+        const sender = state.senderColumns || [];
+        const naming = state.namingColumns || [];
+        const namingSet = new Set(naming);
+        const seen = new Set();
+        const out = [];
+        sender.forEach(n => {
+            seen.add(n);
+            out.push({ name: n, source: namingSet.has(n) ? 'sender + naming' : 'sender' });
+        });
+        naming.forEach(n => {
+            if (!seen.has(n)) out.push({ name: n, source: 'naming' });
+        });
+        return out;
+    }
+
+    function showFieldAutocomplete() {
+        const ctx = getAutocompleteContext();
+        if (!ctx) { hideFieldAutocomplete(); return; }
+        const all = getAvailableFields();
+        if (!all.length) { hideFieldAutocomplete(); return; }
+        const filter = ctx.prefix.toLowerCase();
+        const matches = filter
+            ? all.filter(f => f.name.toLowerCase().includes(filter))
+            : all;
+        if (!matches.length) { hideFieldAutocomplete(); return; }
+        state.autocompleteMatches = matches;
+        if (state.autocompleteIndex >= matches.length) state.autocompleteIndex = 0;
+        renderFieldAutocomplete(ctx);
+    }
+
+    function hideFieldAutocomplete() {
+        namingAc.classList.remove('show');
+        state.autocompleteMatches = [];
+        state.autocompleteIndex = 0;
+    }
+
+    function renderFieldAutocomplete(ctx) {
+        clearChildren(namingAc);
+        state.autocompleteMatches.forEach((m, i) => {
+            const item = document.createElement('div');
+            item.className = 'naming-ac-item' + (i === state.autocompleteIndex ? ' active' : '');
+            const nameSpan = document.createElement('span');
+            nameSpan.textContent = m.name;
+            const srcSpan = document.createElement('span');
+            srcSpan.className = 'naming-ac-source';
+            srcSpan.textContent = m.source;
+            item.appendChild(nameSpan);
+            item.appendChild(srcSpan);
+            item.addEventListener('mousedown', (e) => {
+                e.preventDefault();  // keep input focus
+                insertField(m.name, ctx);
+            });
+            item.addEventListener('mouseenter', () => {
+                state.autocompleteIndex = i;
+                updateAutocompleteActive();
+            });
+            namingAc.appendChild(item);
+        });
+        const rect = inpNamingTemplate.getBoundingClientRect();
+        namingAc.style.left = (rect.left + window.scrollX) + 'px';
+        namingAc.style.top = (rect.bottom + window.scrollY + 4) + 'px';
+        namingAc.style.minWidth = rect.width + 'px';
+        namingAc.classList.add('show');
+    }
+
+    function updateAutocompleteActive() {
+        const items = namingAc.querySelectorAll('.naming-ac-item');
+        items.forEach((it, i) => {
+            it.classList.toggle('active', i === state.autocompleteIndex);
+        });
+    }
+
+    function insertField(name, ctx) {
+        const value = inpNamingTemplate.value;
+        const before = value.slice(0, ctx.start);
+        const afterCursor = value.slice(inpNamingTemplate.selectionStart);
+        const insertion = '{{' + name + '}}';
+        inpNamingTemplate.value = before + insertion + afterCursor;
+        const newPos = before.length + insertion.length;
+        inpNamingTemplate.setSelectionRange(newPos, newPos);
+        state.namingTemplate = inpNamingTemplate.value;
+        saveNamingToStorage();
+        updateNamingPreview();
+        hideFieldAutocomplete();
+        inpNamingTemplate.focus();
+    }
+
+    function onAutocompleteKeydown(e) {
+        if (!namingAc.classList.contains('show')) return;
+        const matches = state.autocompleteMatches;
+        if (!matches.length) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            state.autocompleteIndex = (state.autocompleteIndex + 1) % matches.length;
+            updateAutocompleteActive();
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            state.autocompleteIndex = (state.autocompleteIndex - 1 + matches.length) % matches.length;
+            updateAutocompleteActive();
+        } else if (e.key === 'Enter' || e.key === 'Tab') {
+            e.preventDefault();
+            const ctx = getAutocompleteContext();
+            if (ctx) insertField(matches[state.autocompleteIndex].name, ctx);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            hideFieldAutocomplete();
+        }
+    }
 
     // ============ Init ============
     if (initial.subscriberRow) {

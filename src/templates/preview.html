@@ -554,6 +554,15 @@
         batchProgress.textContent = '0 / 0';
         overlay.classList.add('show');
 
+        let totalEligible = 0;
+        let skippedTotal = 0;
+        let skippedSeen = 0;
+
+        const formatProgress = (done) => {
+            const base = `${done} / ${totalEligible}`;
+            return skippedTotal > 0 ? `${base}  (${skippedTotal} sprunget over)` : base;
+        };
+
         const u = new URL('/batch-stream/' + encodeURIComponent(initial.templateName), window.location.origin);
         u.searchParams.set('file', state.excelFile);
         if (state.sheetName) u.searchParams.set('sheet', state.sheetName);
@@ -564,20 +573,35 @@
             let msg;
             try { msg = JSON.parse(e.data); } catch (_) { return; }
             if (msg.type === 'start') {
-                batchPhase.textContent = 'Starter render af ' + msg.total + ' rækker…';
-                batchProgress.textContent = '0 / ' + msg.total;
+                totalEligible = msg.total || 0;
+                skippedTotal = msg.skipped_total || 0;
+                const note = skippedTotal > 0
+                    ? ` (${skippedTotal} sprunget over — ingen match i naming-fil)`
+                    : '';
+                batchPhase.textContent = 'Starter render af ' + totalEligible + ' rækker…' + note;
+                batchProgress.textContent = formatProgress(0);
             } else if (msg.type === 'phase') {
                 batchPhase.textContent = msg.message;
+            } else if (msg.type === 'skip') {
+                skippedSeen += 1;
+                const line = document.createElement('div');
+                line.style.color = 'var(--text-muted)';
+                line.textContent = '⤬ række ' + (msg.index + 1) + ' sprunget over (key: ' + (msg.key || '∅') + ')';
+                batchFiles.appendChild(line);
+                batchFiles.scrollTop = batchFiles.scrollHeight;
             } else if (msg.type === 'row') {
-                const pct = Math.round((msg.index / msg.total) * 100);
+                const pct = totalEligible ? Math.round((msg.index / totalEligible) * 100) : 0;
                 batchFill.style.width = pct + '%';
-                batchProgress.textContent = `${msg.index} / ${msg.total}`;
+                batchProgress.textContent = formatProgress(msg.index);
                 const line = document.createElement('div');
                 line.textContent = msg.filename + (msg.identifier ? '  · ' + msg.identifier : '');
                 batchFiles.appendChild(line);
                 batchFiles.scrollTop = batchFiles.scrollHeight;
             } else if (msg.type === 'done') {
-                batchPhase.textContent = 'Færdig — ' + msg.total + ' filer eksporteret.';
+                const skipNote = (msg.skipped_total || 0) > 0
+                    ? ` · ${msg.skipped_total} sprunget over`
+                    : '';
+                batchPhase.textContent = 'Færdig — ' + (msg.total || 0) + ' filer eksporteret.' + skipNote;
                 batchFill.style.width = '100%';
                 if (evtSource) { evtSource.close(); evtSource = null; }
             } else if (msg.type === 'error') {

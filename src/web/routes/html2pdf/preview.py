@@ -531,6 +531,45 @@ def naming_lookup():
     return jsonify(index.get(key_value, {}))
 
 
+@bp.route("/naming-match-count")
+def naming_match_count():
+    """Count rows in the sender file whose sender_key value exists in the naming index.
+
+    Returns {"total": <sender rows>, "matched": <rows with naming match>}. Returns
+    400 if any required column is missing; returns zeros if files are missing.
+    """
+    sender_file = request.args.get("file", "").strip()
+    sender_sheet = request.args.get("sheet", "").strip() or None
+    sender_key = request.args.get("sender_key", "").strip()
+    naming_file = request.args.get("naming_file", "").strip()
+    naming_sheet = request.args.get("naming_sheet", "").strip() or None
+    naming_key = request.args.get("naming_key", "").strip()
+
+    if not (sender_file and sender_key and naming_file and naming_key):
+        return jsonify({"total": 0, "matched": 0})
+
+    naming_path = os.path.join(de_dir(), naming_file)
+    if not os.path.isfile(naming_path):
+        return jsonify({"total": 0, "matched": 0})
+
+    try:
+        index = build_naming_index(naming_path, naming_sheet, naming_key)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+    send_list = get_send_list(de_dir(), sender_file, sender_sheet)
+    total = len(send_list)
+    if total and sender_key not in send_list[0]:
+        return jsonify({"error": f"Sender column not found: {sender_key}"}), 400
+
+    matched = 0
+    for row in send_list:
+        key = str(row.get(sender_key, "")).strip()
+        if key and key in index:
+            matched += 1
+    return jsonify({"total": total, "matched": matched})
+
+
 @bp.route("/subscriber_data")
 def get_subscriber_data():
     """AJAX endpoint — return subscriber row data for preview."""

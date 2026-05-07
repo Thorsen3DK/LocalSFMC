@@ -285,6 +285,8 @@
             <option value="">— Naming-fil kolonne —</option>
         </select>
         <input type="text" id="inp-naming-template" placeholder="{{ '{{CPR_NUMBER}}' }}_invoice" style="display:none; flex: 1; min-width: 220px; padding: 7px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px; color: var(--text);">
+        <span id="naming-match-count" style="display:none; font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; padding: 4px 8px; border-radius: 6px; background: var(--bg-secondary);"></span>
+        <span id="naming-file-info" style="display:none; font-size: 11.5px; color: var(--text-secondary); flex-basis: 100%; padding-left: 4px;"></span>
         <span id="naming-preview" style="display:none; font-size: 11.5px; color: var(--text-muted); font-family: 'JetBrains Mono', ui-monospace, monospace; flex-basis: 100%; padding-left: 4px;"></span>
     </div>
 
@@ -351,6 +353,8 @@
     const selNamingKey = document.getElementById('sel-naming-key');
     const inpNamingTemplate = document.getElementById('inp-naming-template');
     const namingPreview = document.getElementById('naming-preview');
+    const namingMatchCount = document.getElementById('naming-match-count');
+    const namingFileInfo = document.getElementById('naming-file-info');
     const namingAc = document.getElementById('naming-autocomplete');
 
     const overlay = document.getElementById('batch-overlay');
@@ -568,7 +572,10 @@
         await loadSubscriberRow();
     }
 
-    selFile.addEventListener('change', () => onFileChange(true).then(loadSubscriberRow));
+    selFile.addEventListener('change', () => onFileChange(true).then(async () => {
+        await loadSubscriberRow();
+        refreshMatchCount();
+    }));
     selSheet.addEventListener('change', async () => {
         state.sheetName = selSheet.value;
         const sheets = await fetchSheets(state.excelFile);
@@ -579,6 +586,7 @@
         updateFrame();
         pushHistory();
         await loadSubscriberRow();
+        refreshMatchCount();
     });
 
     btnPrev.addEventListener('click', () => gotoRow(state.rowIndex - 1));
@@ -775,6 +783,81 @@
         selNamingKey.style.display = has ? '' : 'none';
         inpNamingTemplate.style.display = has ? '' : 'none';
         namingPreview.style.display = has ? '' : 'none';
+        namingMatchCount.style.display = has ? '' : 'none';
+        namingFileInfo.style.display = has ? '' : 'none';
+    }
+
+    let namingFileInfoReqId = 0;
+    async function refreshNamingFileInfo() {
+        clearChildren(namingFileInfo);
+        namingFileInfo.title = '';
+        if (!state.namingFile) return;
+        const reqId = ++namingFileInfoReqId;
+        const cols = state.namingColumns || [];
+        try {
+            const sheets = await fetchSheets(state.namingFile);
+            if (reqId !== namingFileInfoReqId) return;
+            const sheet = state.namingSheet
+                ? sheets.find(s => s.name === state.namingSheet)
+                : sheets[0];
+            const rowCount = sheet ? sheet.rows : 0;
+            const colsLabel = cols.length ? cols.join(', ') : '—';
+            const strong = document.createElement('strong');
+            strong.style.color = 'var(--text)';
+            strong.textContent = `${rowCount} rækker`;
+            namingFileInfo.appendChild(strong);
+            namingFileInfo.appendChild(document.createTextNode(` · ${cols.length} kolonner: `));
+            const colsSpan = document.createElement('span');
+            colsSpan.style.fontFamily = "'JetBrains Mono', ui-monospace, monospace";
+            colsSpan.textContent = colsLabel;
+            namingFileInfo.appendChild(colsSpan);
+            namingFileInfo.title = cols.length ? cols.join('\n') : '';
+        } catch (_) {
+            if (reqId !== namingFileInfoReqId) return;
+            clearChildren(namingFileInfo);
+            namingFileInfo.title = '';
+        }
+    }
+
+    let matchCountReqId = 0;
+    async function refreshMatchCount() {
+        if (!state.namingFile || !state.senderKey || !state.namingKey || !state.excelFile) {
+            namingMatchCount.textContent = '';
+            namingMatchCount.title = '';
+            return;
+        }
+        const reqId = ++matchCountReqId;
+        namingMatchCount.textContent = 'Tæller match…';
+        namingMatchCount.title = '';
+        const u = new URL('/naming-match-count', window.location.origin);
+        u.searchParams.set('file', state.excelFile);
+        if (state.sheetName) u.searchParams.set('sheet', state.sheetName);
+        u.searchParams.set('sender_key', state.senderKey);
+        u.searchParams.set('naming_file', state.namingFile);
+        if (state.namingSheet) u.searchParams.set('naming_sheet', state.namingSheet);
+        u.searchParams.set('naming_key', state.namingKey);
+        try {
+            const resp = await fetch(u.toString());
+            if (reqId !== matchCountReqId) return;
+            if (!resp.ok) {
+                const data = await resp.json().catch(() => ({}));
+                namingMatchCount.textContent = 'Match: fejl';
+                namingMatchCount.title = data.error || 'Kunne ikke tælle match';
+                return;
+            }
+            const data = await resp.json();
+            const total = data.total | 0;
+            const matched = data.matched | 0;
+            const pct = total ? Math.round((matched / total) * 100) : 0;
+            namingMatchCount.textContent = `Match: ${matched} / ${total} (${pct}%)`;
+            namingMatchCount.title = total
+                ? `${matched} af ${total} sender-rækker har en match i naming-filen`
+                : 'Ingen sender-rækker';
+        } catch (_) {
+            if (reqId !== matchCountReqId) return;
+            namingMatchCount.textContent = 'Match: fejl';
+            namingMatchCount.title = 'Netværksfejl';
+        }
     }
 
     function renderTemplateLocally(template, senderRow, lookupRow) {
@@ -831,6 +914,7 @@
     async function refreshAndPreview() {
         await refreshLookupRow();
         updateNamingPreview();
+        refreshMatchCount();
     }
 
     selNamingFile.addEventListener('change', async () => {
@@ -838,6 +922,7 @@
         state.namingKey = '';  // reset on file change
         setNamingVisibility();
         await refreshNamingColumns();
+        refreshNamingFileInfo();
         saveNamingToStorage();
         await refreshAndPreview();
     });
@@ -1020,6 +1105,8 @@
         if (state.totalRows && !initial.subscriberRow) await loadSubscriberRow();
         else await refreshLookupRow();
         updateNamingPreview();
+        refreshMatchCount();
+        refreshNamingFileInfo();
     });
 })();
 </script>

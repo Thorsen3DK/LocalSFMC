@@ -1,0 +1,410 @@
+{% extends "base.html" %}
+{% block title %}LocalSFMC — HTML2PDF{% endblock %}
+
+{% block head %}
+<style>
+    .step-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+    @media (max-width: 880px) {
+        .step-grid { grid-template-columns: 1fr; }
+    }
+
+    .step-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .step-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 9px;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        flex-shrink: 0;
+    }
+    .step-title {
+        font-size: 15px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .step-hint {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        margin-left: auto;
+        background: var(--bg-secondary);
+        padding: 3px 9px;
+        border-radius: 20px;
+        font-weight: 500;
+    }
+
+    /* Dropzone — soft, friendly */
+    .dropzone {
+        border: 1.5px dashed var(--border);
+        border-radius: var(--radius);
+        padding: 28px 18px;
+        text-align: center;
+        cursor: pointer;
+        background: var(--bg-secondary);
+        transition: border-color .15s, background .15s, transform .15s;
+        display: block;
+    }
+    .dropzone:hover {
+        border-color: var(--accent);
+        background: var(--accent-light);
+    }
+    .dropzone.drag-over {
+        border-color: var(--accent);
+        background: var(--accent-light);
+        transform: scale(1.01);
+    }
+    .dropzone-icon {
+        font-size: 22px;
+        margin-bottom: 6px;
+        opacity: .7;
+    }
+    .dropzone-text {
+        font-size: 13.5px;
+        color: var(--text);
+        font-weight: 500;
+    }
+    .dropzone-hint {
+        margin-top: 4px;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+    .dropzone input { display: none; }
+
+    /* File list */
+    .file-list {
+        margin-top: 16px;
+        list-style: none;
+        padding: 0;
+    }
+    .file-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border-radius: 9px;
+        background: var(--bg-secondary);
+        margin-bottom: 6px;
+        transition: background .12s;
+    }
+    .file-item:hover { background: var(--bg-tertiary); }
+    .file-item .file-name {
+        flex: 1;
+        font-size: 13px;
+        font-weight: 500;
+        word-break: break-all;
+        color: var(--text);
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12.5px;
+    }
+    .file-item .file-meta {
+        font-size: 11.5px;
+        color: var(--text-muted);
+        white-space: nowrap;
+    }
+    .file-empty {
+        padding: 24px 16px;
+        text-align: center;
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    .upload-toast {
+        position: fixed;
+        bottom: 24px;
+        right: 24px;
+        padding: 12px 18px;
+        border-radius: var(--radius);
+        background: var(--text);
+        color: #fff;
+        font-size: 13px;
+        font-weight: 500;
+        opacity: 0;
+        transform: translateY(10px);
+        transition: opacity .2s, transform .2s;
+        pointer-events: none;
+        z-index: 100;
+        max-width: 360px;
+        box-shadow: var(--shadow-lg);
+    }
+    .upload-toast.show { opacity: 1; transform: translateY(0); }
+    .upload-toast.error { background: var(--red); }
+    .upload-toast.success { background: var(--green); }
+
+    .actions-row {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>HTML2PDF</h1>
+    <p>Upload Data Extensions og email-skabeloner. Render og eksportér til PDF.</p>
+</div>
+
+<div class="step-grid">
+    <!-- Sender DEs -->
+    <div class="card">
+        <div class="card-body">
+            <div class="step-header">
+                <span class="step-number">1</span>
+                <span class="step-title">Sender DEs</span>
+                <span class="step-hint">send list</span>
+            </div>
+            <p class="text-secondary text-sm" style="margin: -4px 0 14px;">
+                Datafiler der bruges som send list — én række pr. modtager. Vælges som datakilde i preview.
+            </p>
+            <label class="dropzone" id="dz-sender">
+                <input type="file" accept=".csv,.xlsx" multiple>
+                <div class="dropzone-icon">📤</div>
+                <div class="dropzone-text">Klik eller træk filer hertil</div>
+                <div class="dropzone-hint">.csv eller .xlsx</div>
+            </label>
+            <ul class="file-list" id="sender-list"></ul>
+        </div>
+    </div>
+
+    <!-- Mapping DEs -->
+    <div class="card">
+        <div class="card-body">
+            <div class="step-header">
+                <span class="step-number">2</span>
+                <span class="step-title">Mapping DEs</span>
+                <span class="step-hint">lookups</span>
+            </div>
+            <p class="text-secondary text-sm" style="margin: -4px 0 14px;">
+                Lookup-tabeller brugt af AMPScript (<code>LookupRows</code>, <code>Lookup</code> m.fl.) ved render-tid.
+            </p>
+            <label class="dropzone" id="dz-mapping">
+                <input type="file" accept=".csv,.xlsx" multiple>
+                <div class="dropzone-icon">🔗</div>
+                <div class="dropzone-text">Klik eller træk filer hertil</div>
+                <div class="dropzone-hint">.csv eller .xlsx</div>
+            </label>
+            <ul class="file-list" id="mapping-list"></ul>
+        </div>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+    <div class="card-body">
+        <div class="step-header">
+            <span class="step-number">3</span>
+            <span class="step-title">Naming files</span>
+            <span class="step-hint">filnavngivning · valgfrit</span>
+        </div>
+        <p class="text-secondary text-sm" style="margin: -4px 0 14px;">
+            Lookup-fil til filnavngivning. Joines på en valgt kolonne i preview, og
+            navngiver de eksporterede PDF'er ud fra en skabelon som
+            <code>{{ '{{CPR_NUMBER}}' }}_invoice</code>.
+        </p>
+        <label class="dropzone" id="dz-naming">
+            <input type="file" accept=".csv,.xlsx" multiple>
+            <div class="dropzone-icon">🏷️</div>
+            <div class="dropzone-text">Klik eller træk filer hertil</div>
+            <div class="dropzone-hint">.csv eller .xlsx</div>
+        </label>
+        <ul class="file-list" id="naming-list"></ul>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+    <div class="card-body">
+        <div class="step-header">
+            <span class="step-number">4</span>
+            <span class="step-title">Email-skabeloner</span>
+            <span class="step-hint">HTML</span>
+        </div>
+        <label class="dropzone" id="dz-html">
+            <input type="file" accept=".html,.htm" multiple>
+            <div class="dropzone-icon">✉️</div>
+            <div class="dropzone-text">Klik eller træk HTML-filer hertil</div>
+            <div class="dropzone-hint">Skabelonen kan indeholde AMPScript og %%=ContentBlockByName()=%%-kald</div>
+        </label>
+        <ul class="file-list" id="html-list"></ul>
+    </div>
+</div>
+
+<div class="card" style="margin-bottom:16px;">
+    <div class="card-body">
+        <div class="step-header">
+            <span class="step-number">5</span>
+            <span class="step-title">DE-navne aliasser</span>
+            <span class="step-hint">valgfrit</span>
+        </div>
+        <p class="text-secondary text-sm" style="margin-bottom:14px;">
+            Map AMPScript DE-navne (fx <code>WOMBAT_SUBS</code>) til faktiske sheet-navne i en uploadet Excel-fil.
+            Datoprefiks som <code>4-28-2026-WOMBAT_SUBS</code> auto-aliasses til <code>WOMBAT_SUBS</code>.
+        </p>
+        <a href="/mapping" class="btn">Konfigurér aliasser</a>
+        <a href="/output" class="btn" style="margin-left:6px;">Se eksporterede PDF'er</a>
+    </div>
+</div>
+
+<div id="toast" class="upload-toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const dzSender = document.getElementById('dz-sender');
+    const dzMapping = document.getElementById('dz-mapping');
+    const dzHtml = document.getElementById('dz-html');
+    const dzNaming = document.getElementById('dz-naming');
+    const senderList = document.getElementById('sender-list');
+    const mappingList = document.getElementById('mapping-list');
+    const htmlList = document.getElementById('html-list');
+    const namingList = document.getElementById('naming-list');
+    const toast = document.getElementById('toast');
+
+    function showToast(msg, type) {
+        toast.textContent = msg;
+        toast.className = 'upload-toast show ' + (type || '');
+        clearTimeout(showToast._t);
+        showToast._t = setTimeout(() => { toast.classList.remove('show'); }, 2200);
+    }
+
+    function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+            for (const k in attrs) {
+                if (k === 'class') node.className = attrs[k];
+                else if (k === 'text') node.textContent = attrs[k];
+                else if (k === 'style') node.setAttribute('style', attrs[k]);
+                else node[k] = attrs[k];
+            }
+        }
+        if (children) for (const c of children) {
+            if (c == null) continue;
+            node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+        }
+        return node;
+    }
+
+    function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
+
+    async function loadFiles() {
+        const resp = await fetch('/upload/files');
+        const data = await resp.json();
+        renderDataList(senderList, data.sender_files || [], 'Ingen sender-filer endnu.');
+        renderDataList(mappingList, data.mapping_files || [], 'Ingen mapping-filer endnu.');
+        renderDataList(namingList, data.naming_files || [], 'Ingen naming-filer endnu.');
+        renderHtmlList(data.html_files || []);
+    }
+
+    function renderDataList(container, files, emptyText) {
+        clearChildren(container);
+        if (!files.length) {
+            container.appendChild(el('div', { class: 'file-empty', text: emptyText }));
+            return;
+        }
+        files.forEach(name => {
+            const delBtn = el('button', { class: 'btn btn-sm btn-danger', text: 'Slet' });
+            delBtn.addEventListener('click', () => deleteFile(name));
+            container.appendChild(el('li', { class: 'file-item' }, [
+                el('span', { class: 'file-name', text: name }),
+                delBtn,
+            ]));
+        });
+    }
+
+    function renderHtmlList(files) {
+        clearChildren(htmlList);
+        if (!files.length) {
+            htmlList.appendChild(el('div', { class: 'file-empty', text: 'Ingen skabeloner uploadet endnu.' }));
+            return;
+        }
+        files.forEach(name => {
+            const previewBtn = el('a', { class: 'btn btn-sm', href: '/preview/' + encodeURIComponent(name), text: 'Åbn' });
+            const delBtn = el('button', { class: 'btn btn-sm btn-danger', text: 'Slet' });
+            delBtn.addEventListener('click', () => deleteFile(name));
+            const actions = el('div', { class: 'actions-row' }, [previewBtn, delBtn]);
+            htmlList.appendChild(el('li', { class: 'file-item' }, [
+                el('span', { class: 'file-name', text: name }),
+                actions,
+            ]));
+        });
+    }
+
+    async function deleteFile(name) {
+        if (!confirm('Slet "' + name + '"?')) return;
+        const resp = await fetch('/upload/delete/' + encodeURIComponent(name), { method: 'DELETE' });
+        if (resp.ok) {
+            showToast('Slettet: ' + name, 'success');
+            loadFiles();
+        } else {
+            const err = await resp.json().catch(() => ({}));
+            showToast('Kunne ikke slette: ' + (err.error || resp.statusText), 'error');
+        }
+    }
+
+    async function uploadOne(file, endpoint) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const resp = await fetch(endpoint, { method: 'POST', body: fd });
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.error) {
+            showToast('Fejl: ' + (data.error || resp.statusText), 'error');
+            return false;
+        }
+        showToast('Uploadet: ' + file.name, 'success');
+        return true;
+    }
+
+    async function uploadFiles(fileList, endpoint) {
+        const files = Array.from(fileList);
+        if (!files.length) return;
+        let any = false;
+        for (const f of files) {
+            const ok = await uploadOne(f, endpoint);
+            if (ok) any = true;
+        }
+        if (any) loadFiles();
+    }
+
+    function wireDropzone(zone, endpoint) {
+        const input = zone.querySelector('input[type=file]');
+        // The dropzone is a <label> wrapping the input — clicking it already
+        // forwards a click to the input natively, so no manual click handler.
+        input.addEventListener('change', () => {
+            uploadFiles(input.files, endpoint);
+            input.value = '';
+        });
+        zone.addEventListener('dragover', e => {
+            e.preventDefault();
+            zone.classList.add('drag-over');
+        });
+        zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+        zone.addEventListener('drop', e => {
+            e.preventDefault();
+            zone.classList.remove('drag-over');
+            if (e.dataTransfer && e.dataTransfer.files) uploadFiles(e.dataTransfer.files, endpoint);
+        });
+    }
+
+    wireDropzone(dzSender, '/upload/sender-csv');
+    wireDropzone(dzMapping, '/upload/lookup-csv');
+    wireDropzone(dzNaming, '/upload/naming-csv');
+    wireDropzone(dzHtml, '/upload/email-html');
+    loadFiles();
+})();
+</script>
+{% endblock %}

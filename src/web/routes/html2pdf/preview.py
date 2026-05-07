@@ -33,43 +33,42 @@ def _list_templates():
 
 @bp.route("/preview/<template_name>")
 def preview(template_name: str):
-    """Preview a single subscriber render of an email template."""
+    """Preview UI — picks a data file/sheet and renders rows in an iframe.
+
+    The actual rendered HTML is served by ``/preview/<name>/raw`` (iframed by
+    the page). When no ``?file=`` is supplied we still render the page so the
+    user can pick a data source from the UI; otherwise we resolve the row count
+    and current row up-front so the controls render correctly.
+    """
     template_path = os.path.join(emails_dir(), template_name)
     if not os.path.isfile(template_path):
         return "Template not found", 404
 
     excel_file = request.args.get("file", "")
     sheet_name = request.args.get("sheet", "")
-    row_index = int(request.args.get("row", "0"))
+    try:
+        row_index = int(request.args.get("row", "0"))
+    except ValueError:
+        row_index = 0
 
-    if not excel_file:
-        return "No Excel file specified", 400
+    subscriber_row: Dict[str, Any] | None = None
+    total_rows = 0
 
-    send_list = get_send_list(de_dir(), excel_file, sheet_name or None)
-    if not send_list:
-        return "No data rows found", 400
-
-    row_index = max(0, min(row_index, len(send_list) - 1))
-    subscriber_row = send_list[row_index]
-    all_des = load_all(de_dir())
-
-    with open(template_path, "r", encoding="utf-8") as f:
-        template_source = f.read()
-
-    rendered_html = ampscript_render(
-        template_source=template_source,
-        subscriber_row=subscriber_row,
-        data_extensions=all_des,
-        content_block_loader=content_block_loader,
-    )
+    if excel_file:
+        send_list = get_send_list(de_dir(), excel_file, sheet_name or None)
+        total_rows = len(send_list)
+        if total_rows:
+            row_index = max(0, min(row_index, total_rows - 1))
+            subscriber_row = send_list[row_index]
+        else:
+            row_index = 0
 
     return render_template(
         "preview.html",
         template_name=template_name,
-        rendered_html=rendered_html,
         subscriber_row=subscriber_row,
         row_index=row_index,
-        total_rows=len(send_list),
+        total_rows=total_rows,
         excel_file=excel_file,
         sheet_name=sheet_name,
     )
@@ -352,8 +351,8 @@ def batch_export_stream(template_name: str):
 
 @bp.route("/sheets")
 def get_sheets():
-    """AJAX endpoint — return sheets for a given Excel file."""
-    from data.excel_loader import load_excel_file
+    """Return sheet info for a data file. CSV files surface as a single sheet."""
+    from data.excel_loader import load_csv_file, load_excel_file
 
     filename = request.args.get("file", "")
     if not filename:
@@ -361,11 +360,55 @@ def get_sheets():
     filepath = os.path.join(de_dir(), filename)
     if not os.path.isfile(filepath):
         return jsonify([])
+
+    if filename.lower().endswith(".csv"):
+        try:
+            rows = load_csv_file(filepath)
+            return jsonify([{"name": "", "rows": len(rows)}])
+        except Exception:
+            return jsonify([])
+
     try:
         sheets = load_excel_file(filepath)
         return jsonify([{"name": name, "rows": len(rows)} for name, rows in sheets.items()])
     except Exception:
         return jsonify([])
+
+
+@bp.route("/columns")
+def get_columns():
+    """Return column names for a data file (CSV or XLSX sheet).
+
+    Used by the preview page to populate join-column dropdowns for naming.
+    """
+    from data.excel_loader import load_csv_file, load_excel_file
+
+    filename = request.args.get("file", "")
+    sheet_name = request.args.get("sheet", "")
+    if not filename:
+        return jsonify([])
+
+    filepath = os.path.join(de_dir(), filename)
+    if not os.path.isfile(filepath):
+        return jsonify([])
+
+    try:
+        if filename.lower().endswith(".csv"):
+            rows = load_csv_file(filepath)
+        else:
+            sheets = load_excel_file(filepath)
+            if sheet_name and sheet_name in sheets:
+                rows = sheets[sheet_name]
+            elif sheets:
+                rows = next(iter(sheets.values()))
+            else:
+                return jsonify([])
+    except Exception:
+        return jsonify([])
+
+    if not rows:
+        return jsonify([])
+    return jsonify(list(rows[0].keys()))
 
 
 @bp.route("/subscriber_data")

@@ -1,15 +1,18 @@
 """
 File upload and management routes.
 
-Data Extensions are split into two semantic types:
+Data Extensions are split into three semantic types:
 
 * ``sender``  — drives the send list (one row per subscriber). Selectable as
   the data source on the preview page.
 * ``mapping`` — lookup tables joined by AMPScript at render time.
+* ``naming``  — lookup tables consumed only by the PDF filename templating
+  on the preview page; never passed to the AMPScript renderer.
 
-Both kinds live in the same directory; the type is tracked in a sidecar
+All three live in the same directory; the type is tracked in a sidecar
 ``_de_types.json`` so the listing endpoints can split them. Files without an
-entry default to ``mapping`` — sender membership has to be explicit.
+entry — and entries with unrecognised values — default to ``mapping``;
+``sender`` and ``naming`` membership have to be explicit.
 """
 
 import json
@@ -103,7 +106,7 @@ def _classify_de_files(files: List[str]) -> Tuple[List[str], List[str], List[str
 # ---------- Upload endpoints ----------
 
 def _save_data_upload(de_type: str):
-    """Common handler for sender/mapping DE uploads."""
+    """Common handler for sender/mapping/naming DE uploads."""
     if "file" not in request.files:
         return jsonify({"error": "No file provided"}), 400
 

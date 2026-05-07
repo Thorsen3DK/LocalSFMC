@@ -728,8 +728,8 @@
             return v == null ? '' : String(v);
         });
         if (/\.pdf$/i.test(s)) s = s.slice(0, -4);
+        if (!s.trim()) return '';
         s = Array.from(s).map(c => /[A-Za-z0-9._-]/.test(c) ? c : '_').join('');
-        s = s.replace(/^_+|_+$/g, '').trim();
         return s ? s + '.pdf' : '';
     }
 

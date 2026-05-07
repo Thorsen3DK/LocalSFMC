@@ -865,16 +865,21 @@
     inpNamingTemplate.addEventListener('focus', showFieldAutocomplete);
 
     // ============ Field autocomplete ============
+    // Jinja: braces are escaped via string concat ('{' + '{') so the template
+    // engine doesn't strip them as template directives.
+    const OPEN_BRACES = '{' + '{';
+    const CLOSE_BRACES = '}' + '}';
+
     function getAutocompleteContext() {
         const value = inpNamingTemplate.value;
         const cursor = inpNamingTemplate.selectionStart;
         if (cursor == null) return null;
         const before = value.slice(0, cursor);
-        const lastOpen = before.lastIndexOf('{{');
+        const lastOpen = before.lastIndexOf(OPEN_BRACES);
         if (lastOpen === -1) return null;
         const after = before.slice(lastOpen + 2);
-        // Cancel if a `}}` already closed the placeholder before the cursor.
-        if (after.includes('}}')) return null;
+        // Cancel if a closing pair already appeared before the cursor.
+        if (after.includes(CLOSE_BRACES)) return null;
         // Only show when the prefix is empty or alphanumeric/underscore.
         if (!/^[A-Za-z0-9_]*$/.test(after)) return null;
         return { start: lastOpen, prefix: after };
@@ -957,7 +962,7 @@
         const value = inpNamingTemplate.value;
         const before = value.slice(0, ctx.start);
         const afterCursor = value.slice(inpNamingTemplate.selectionStart);
-        const insertion = '{{' + name + '}}';
+        const insertion = OPEN_BRACES + name + CLOSE_BRACES;
         inpNamingTemplate.value = before + insertion + afterCursor;
         const newPos = before.length + insertion.length;
         inpNamingTemplate.setSelectionRange(newPos, newPos);

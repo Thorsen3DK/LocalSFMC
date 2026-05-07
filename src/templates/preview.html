@@ -324,6 +324,7 @@
         senderColumns: [],
         namingColumns: [],
         currentRowData: null,
+        currentLookupRow: null,
     };
 
     function clearChildren(node) { while (node.firstChild) node.removeChild(node.firstChild); }
@@ -463,6 +464,7 @@
         if (!state.excelFile || !state.totalRows) {
             clearChildren(rowTableBody);
             state.currentRowData = null;
+            state.currentLookupRow = null;
             updateNamingPreview();
             return;
         }
@@ -470,6 +472,7 @@
         const row = resp.ok ? await resp.json() : {};
         state.currentRowData = row;
         renderSubscriberRow(row);
+        await refreshLookupRow();
         updateNamingPreview();
     }
 
@@ -733,7 +736,26 @@
         return s ? s + '.pdf' : '';
     }
 
-    async function updateNamingPreview() {
+    async function refreshLookupRow() {
+        state.currentLookupRow = null;
+        if (!state.namingFile || !state.senderKey || !state.namingKey || !state.currentRowData) return;
+        const key = state.currentRowData[state.senderKey];
+        if (key === undefined || key === null || key === '') return;
+        const u = new URL('/naming-lookup', window.location.origin);
+        u.searchParams.set('file', state.namingFile);
+        if (state.namingSheet) u.searchParams.set('sheet', state.namingSheet);
+        u.searchParams.set('key_col', state.namingKey);
+        u.searchParams.set('key_value', String(key).trim());
+        try {
+            const resp = await fetch(u.toString());
+            const row = resp.ok ? await resp.json() : {};
+            state.currentLookupRow = Object.keys(row).length ? row : null;
+        } catch (_) {
+            state.currentLookupRow = null;
+        }
+    }
+
+    function updateNamingPreview() {
         if (!namingConfigured() || !state.currentRowData) {
             namingPreview.textContent = '';
             return;
@@ -744,15 +766,17 @@
             namingPreview.textContent = '(ingen sender-værdi for ' + state.senderKey + ')';
             return;
         }
-        // Local preview only — uses the sender value as a stand-in for the lookup
-        // value. The actual filename is computed server-side at export time using
-        // the real lookup row.
-        const fakeLookup = {};
-        fakeLookup[state.namingKey] = String(key).trim();
-        const rendered = renderTemplateLocally(state.namingTemplate, senderRow, fakeLookup);
-        namingPreview.textContent = rendered
-            ? 'Eksempel: ' + rendered + '  (faktisk navn afhænger af lookup-rækken)'
-            : '(skabelon tom)';
+        if (state.currentLookupRow === null) {
+            namingPreview.textContent = '(ingen match i naming-fil for ' + state.senderKey + '=' + key + ')';
+            return;
+        }
+        const rendered = renderTemplateLocally(state.namingTemplate, senderRow, state.currentLookupRow);
+        namingPreview.textContent = rendered ? 'Eksempel: ' + rendered : '(skabelon tom)';
+    }
+
+    async function refreshAndPreview() {
+        await refreshLookupRow();
+        updateNamingPreview();
     }
 
     selNamingFile.addEventListener('change', async () => {
@@ -761,17 +785,17 @@
         setNamingVisibility();
         await refreshNamingColumns();
         saveNamingToStorage();
-        updateNamingPreview();
+        await refreshAndPreview();
     });
-    selSenderKey.addEventListener('change', () => {
+    selSenderKey.addEventListener('change', async () => {
         state.senderKey = selSenderKey.value;
         saveNamingToStorage();
-        updateNamingPreview();
+        await refreshAndPreview();
     });
-    selNamingKey.addEventListener('change', () => {
+    selNamingKey.addEventListener('change', async () => {
         state.namingKey = selNamingKey.value;
         saveNamingToStorage();
-        updateNamingPreview();
+        await refreshAndPreview();
     });
     inpNamingTemplate.addEventListener('input', () => {
         state.namingTemplate = inpNamingTemplate.value;
@@ -802,6 +826,7 @@
         await refreshNamingColumns();
         setNamingVisibility();
         if (state.totalRows && !initial.subscriberRow) await loadSubscriberRow();
+        else await refreshLookupRow();
         updateNamingPreview();
     });
 })();

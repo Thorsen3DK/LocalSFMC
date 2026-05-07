@@ -512,6 +512,25 @@ def get_columns():
     return jsonify(list(rows[0].keys()))
 
 
+@bp.route("/naming-lookup")
+def naming_lookup():
+    """Return the single naming-file row matching key_col == key_value, or {}."""
+    filename = request.args.get("file", "").strip()
+    sheet_name = request.args.get("sheet", "").strip() or None
+    key_col = request.args.get("key_col", "").strip()
+    key_value = request.args.get("key_value", "").strip()
+    if not (filename and key_col):
+        return jsonify({})
+    filepath = os.path.join(de_dir(), filename)
+    if not os.path.isfile(filepath):
+        return jsonify({})
+    try:
+        index = build_naming_index(filepath, sheet_name, key_col)
+    except Exception:
+        return jsonify({})
+    return jsonify(index.get(key_value, {}))
+
+
 @bp.route("/subscriber_data")
 def get_subscriber_data():
     """AJAX endpoint — return subscriber row data for preview."""

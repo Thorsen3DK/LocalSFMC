@@ -13,3 +13,4 @@ from web.routes import dashboard   # noqa: E402, F401
 from web.routes import html2pdf    # noqa: E402, F401
 from web.routes import search      # noqa: E402, F401
 from web.routes import journey     # noqa: E402, F401
+from web.routes import blockname   # noqa: E402, F401

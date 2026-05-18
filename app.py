@@ -30,11 +30,12 @@ def create_app() -> Flask:
     app.config["DATA_EXTENSIONS_DIR"] = os.path.join(base_dir, "content", "data_extensions")
     app.config["OUTPUT_DIR"] = os.path.join(base_dir, "content", "output")
     app.config["JOURNEY_DATA_DIR"] = os.path.join(base_dir, "data", "journey")
+    app.config["BLOCKNAME_DATA_DIR"] = os.path.join(base_dir, "data", "blockname")
     app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024  # 500 MB upload limit
     app.secret_key = "localsfmc-dev-key"
 
     # Ensure directories exist
-    for d in ("content/emails", "content/data_extensions", "content/output", "data/journey"):
+    for d in ("content/emails", "content/data_extensions", "content/output", "data/journey", "data/blockname"):
         os.makedirs(os.path.join(base_dir, d), exist_ok=True)
 
     from web.routes import bp

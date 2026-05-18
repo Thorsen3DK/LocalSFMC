@@ -1,0 +1,1026 @@
+{% extends "base.html" %}
+{% block title %}LocalSFMC — Block Name Generator{% endblock %}
+
+{% block head %}
+<style>
+    /* Tabs */
+    .tabs {
+        display: inline-flex;
+        background: var(--bg-secondary);
+        padding: 4px;
+        border-radius: 10px;
+        gap: 2px;
+        margin-bottom: 28px;
+    }
+    .tab-btn {
+        padding: 7px 16px;
+        border: none;
+        background: transparent;
+        font-family: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        cursor: pointer;
+        border-radius: 7px;
+        transition: background .15s, color .15s, box-shadow .15s;
+    }
+    .tab-btn:hover { color: var(--text); }
+    .tab-btn.active {
+        background: var(--bg);
+        color: var(--text);
+        box-shadow: var(--shadow-sm);
+        font-weight: 600;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* Generator form */
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+    .form-group label {
+        display: block;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--text-secondary);
+        margin-bottom: 7px;
+        letter-spacing: -0.005em;
+    }
+    .form-group label .required { color: var(--red); margin-left: 2px; }
+    .form-group label .optional {
+        color: var(--text-muted);
+        font-weight: 400;
+        margin-left: 4px;
+    }
+    .form-group select,
+    .form-group input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        background: var(--bg);
+        color: var(--text);
+        font-family: inherit;
+        font-size: 13.5px;
+        transition: border-color .12s, box-shadow .12s, background .12s;
+    }
+    .form-group select:hover,
+    .form-group input:hover {
+        border-color: var(--text-muted);
+    }
+    .form-group select:focus,
+    .form-group input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-light);
+    }
+    .form-group.error select,
+    .form-group.error input {
+        border-color: var(--red);
+        background: var(--red-light);
+    }
+    .form-group .error-text {
+        color: var(--red);
+        font-size: 11.5px;
+        margin-top: 6px;
+        display: none;
+    }
+    .form-group.error .error-text { display: block; }
+
+    .form-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    /* Result */
+    .result-box {
+        margin-top: 24px;
+        padding: 18px 20px;
+        border-radius: var(--radius);
+        display: none;
+    }
+    .result-box.success {
+        display: block;
+        background: var(--green-light);
+    }
+    .result-box.error {
+        display: block;
+        background: var(--red-light);
+    }
+    .result-label {
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 8px;
+        letter-spacing: -0.005em;
+    }
+    .result-box.success .result-label { color: var(--green); }
+    .result-box.error .result-label { color: var(--red); }
+    .result-name {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 13px;
+        font-weight: 500;
+        color: var(--text);
+        word-break: break-all;
+        line-height: 1.6;
+        background: rgba(255,255,255,0.5);
+        padding: 10px 12px;
+        border-radius: 8px;
+    }
+
+    /* Lookup */
+    .lookup-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+    .lookup-card { padding: 0; display: flex; flex-direction: column; }
+    .lookup-card-header {
+        padding: 14px 16px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+    }
+    .lookup-card-header h3 {
+        font-size: 13px;
+        color: var(--text);
+        font-weight: 600;
+        letter-spacing: -0.01em;
+    }
+    .lookup-search-toggle {
+        cursor: pointer;
+        color: var(--text-muted);
+        font-size: 15px;
+        padding: 4px;
+        border-radius: 6px;
+        transition: color .12s, background .12s;
+        display: flex;
+        align-items: center;
+    }
+    .lookup-search-toggle:hover {
+        color: var(--accent);
+        background: var(--accent-light);
+    }
+    .lookup-search-input {
+        width: 100%;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-family: inherit;
+        background: var(--bg-secondary);
+        margin-bottom: 10px;
+        display: none;
+    }
+    .lookup-search-input.visible { display: block; }
+    .lookup-search-input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+        background: var(--bg);
+    }
+    .lookup-card-body {
+        padding: 0 16px 16px;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+    }
+    .tags-scroll {
+        max-height: 180px;
+        overflow-y: auto;
+        flex: 1;
+    }
+
+    .add-row {
+        display: flex;
+        gap: 6px;
+        margin-bottom: 12px;
+    }
+    .add-row input {
+        flex: 1;
+        padding: 7px 10px;
+        border: 1px solid var(--border);
+        border-radius: 7px;
+        font-size: 12.5px;
+        font-family: inherit;
+        background: var(--bg-secondary);
+    }
+    .add-row input:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px var(--accent-light);
+        background: var(--bg);
+    }
+
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        min-height: 24px;
+    }
+    .tag {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 5px;
+        padding: 6px 12px;
+        background: var(--accent-light);
+        color: var(--accent);
+        border-radius: 20px;
+        font-size: 11.5px;
+        font-weight: 500;
+        letter-spacing: 0.01em;
+        white-space: nowrap;
+    }
+    .tag .remove-tag {
+        cursor: pointer;
+        font-size: 14px;
+        line-height: 1;
+        opacity: 0.6;
+        transition: opacity .12s;
+    }
+    .tag .remove-tag:hover { opacity: 1; }
+
+    /* History */
+    .history-section { margin-top: 40px; }
+    .history-section h2 {
+        font-size: 16px;
+        font-weight: 600;
+        margin-bottom: 14px;
+    }
+    .history-table { width: 100%; border-collapse: collapse; }
+    .history-table th {
+        text-align: left;
+        padding: 12px 18px;
+        font-size: 11.5px;
+        font-weight: 500;
+        color: var(--text-muted);
+        letter-spacing: 0.02em;
+    }
+    .history-table td {
+        padding: 12px 18px;
+        font-size: 13px;
+        border-top: 1px solid var(--border-light);
+        vertical-align: middle;
+    }
+    .history-table tbody tr:hover {
+        background: var(--bg-secondary);
+    }
+    .history-table .block-name-cell {
+        font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        font-size: 12px;
+        word-break: break-all;
+        color: var(--text);
+    }
+    .empty-history {
+        padding: 56px 20px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 13.5px;
+    }
+    .empty-history::before {
+        content: "✦";
+        display: block;
+        font-size: 24px;
+        margin-bottom: 8px;
+        color: var(--bg-tertiary);
+    }
+
+    /* Grouping */
+    .group-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 14px;
+        min-height: 36px;
+    }
+    .group-actions .btn { transition: opacity .15s; }
+    .history-table .cb-cell { width: 36px; text-align: center; }
+    .history-table input[type="checkbox"] {
+        width: 16px; height: 16px; cursor: pointer;
+        accent-color: var(--accent);
+    }
+    .group-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 11px;
+        font-weight: 500;
+        padding: 3px 9px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+    .group-badge.master {
+        background: var(--accent-light);
+        color: var(--accent);
+    }
+    .group-badge.child {
+        background: var(--bg-secondary);
+        color: var(--text-secondary);
+    }
+    .group-badge .unlink {
+        cursor: pointer;
+        opacity: .5;
+        font-size: 13px;
+        transition: opacity .12s;
+    }
+    .group-badge .unlink:hover { opacity: 1; }
+    tr.group-row { background: var(--accent-light); }
+    tr.group-row:hover { background: #dddcf7; }
+
+    /* Master picker modal */
+    .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,.35);
+        z-index: 100;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .modal-box {
+        background: var(--bg);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
+        padding: 28px;
+        max-width: 440px;
+        width: 90%;
+    }
+    .modal-box h3 { margin-bottom: 16px; }
+    .modal-options { display: flex; flex-direction: column; gap: 6px; margin-bottom: 20px; }
+    .modal-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 14px;
+        border: 1px solid var(--border);
+        border-radius: 9px;
+        cursor: pointer;
+        transition: border-color .12s, background .12s;
+        font-size: 13px;
+    }
+    .modal-option:hover { border-color: var(--accent); background: var(--accent-light); }
+    .modal-option input[type="radio"] { accent-color: var(--accent); }
+    .modal-option .opt-id { font-weight: 600; min-width: 50px; }
+    .modal-option .opt-name {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 11.5px;
+        word-break: break-all;
+        color: var(--text-secondary);
+    }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+
+    /* Masterblocks overview */
+    .master-group {
+        margin-bottom: 20px;
+    }
+    .master-group-header {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 14px 20px;
+        background: var(--accent-light);
+        border-radius: var(--radius) var(--radius) 0 0;
+        border: 1px solid var(--border);
+        border-bottom: none;
+    }
+    .master-group-header .master-label {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--accent);
+        background: var(--bg);
+        padding: 3px 9px;
+        border-radius: 20px;
+    }
+    .master-group-header .master-name {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--text);
+        word-break: break-all;
+    }
+    .master-group-children {
+        border: 1px solid var(--border);
+        border-radius: 0 0 var(--radius) var(--radius);
+        overflow: hidden;
+    }
+    .master-group-child {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px 20px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        color: var(--text-secondary);
+        border-top: 1px solid var(--border-light);
+    }
+    .master-group-child:first-child { border-top: none; }
+    .master-group-child .child-id {
+        font-size: 11px;
+        font-weight: 600;
+        color: var(--text-muted);
+        min-width: 50px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>Block Name Generator</h1>
+    <p>Konsistent navngivning af SFMC content blocks.</p>
+</div>
+
+<div class="tabs">
+    <button class="tab-btn active" data-tab="generator">Generator</button>
+    <button class="tab-btn" data-tab="lookup">Lookup-værdier</button>
+    <button class="tab-btn" data-tab="masterblocks">Masterblocks</button>
+</div>
+
+<!-- Generator Tab -->
+<div class="tab-content active" id="tab-generator">
+    <div class="card">
+        <div class="card-body">
+            <div class="form-grid">
+                <div class="form-group" id="fg-topProductCategory">
+                    <label>Top Product Category <span class="required">*</span></label>
+                    <select id="sel-topProductCategory"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-secondProductCategory">
+                    <label>Second Product Category <span class="required">*</span></label>
+                    <select id="sel-secondProductCategory"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-specificProduct1">
+                    <label>Specific Product 1 <span class="required">*</span></label>
+                    <select id="sel-specificProduct1"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-specificProduct2">
+                    <label>Specific Product 2 <span class="required">*</span></label>
+                    <select id="sel-specificProduct2"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-specificProduct3">
+                    <label>Specific Product 3 <span class="required">*</span></label>
+                    <select id="sel-specificProduct3"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-specificProduct4">
+                    <label>Specific Product 4 <span class="required">*</span></label>
+                    <select id="sel-specificProduct4"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-price">
+                    <label>Price <span class="required">*</span></label>
+                    <select id="sel-price"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-contentType">
+                    <label>Content Type <span class="required">*</span></label>
+                    <select id="sel-contentType"><option value="">— Vælg —</option></select>
+                    <div class="error-text">Påkrævet felt</div>
+                </div>
+                <div class="form-group" id="fg-notes">
+                    <label>Notes <span class="optional">(valgfrit)</span></label>
+                    <input type="text" id="inp-notes" placeholder="Fx kampagnenavn, beskrivelse...">
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button class="btn btn-primary" id="btn-generate">Generér Block Name</button>
+            </div>
+
+            <div class="result-box" id="result-box">
+                <div class="result-label" id="result-label"></div>
+                <div class="result-name" id="result-name"></div>
+                <div style="margin-top:10px;">
+                    <button class="btn btn-sm" id="btn-copy" style="display:none;">Kopiér til clipboard</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="history-section">
+        <h2>Genererede block-navne</h2>
+        <div class="group-actions" id="group-actions" style="display:none;">
+            <button class="btn btn-primary btn-sm" id="btn-link">Kæd sammen</button>
+            <span class="text-muted text-sm" id="selected-count"></span>
+        </div>
+        <div class="card">
+            <table class="history-table" id="history-table">
+                <thead>
+                    <tr>
+                        <th class="cb-cell"></th>
+                        <th style="width:60px;">Block ID</th>
+                        <th>Block Name</th>
+                        <th style="width:120px;">Gruppe</th>
+                        <th style="width:160px;">Dato</th>
+                        <th style="width:60px;"></th>
+                    </tr>
+                </thead>
+                <tbody id="history-body"></tbody>
+            </table>
+            <div class="empty-history" id="empty-history">Ingen block names genereret endnu.</div>
+        </div>
+    </div>
+</div>
+
+<!-- Lookup Tab -->
+<div class="tab-content" id="tab-lookup">
+    <div class="lookup-grid" id="lookup-grid"></div>
+</div>
+
+<!-- Masterblocks Tab -->
+<div class="tab-content" id="tab-masterblocks">
+    <div id="masterblocks-container"></div>
+    <div class="empty-history" id="empty-masterblocks" style="display:none;">Ingen grupper oprettet endnu.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+    const FIELD_LABELS = {
+        topProductCategory: 'Top Product Category',
+        secondProductCategory: 'Second Product Category',
+        specificProduct: 'Specific Product',
+        price: 'Price',
+        contentType: 'Content Type',
+    };
+
+    // Fields that use the "specificProduct" lookup list
+    const SPECIFIC_FIELDS = ['specificProduct1', 'specificProduct2', 'specificProduct3', 'specificProduct4'];
+
+    // All dropdown fields in the generator
+    const ALL_FIELDS = ['topProductCategory', 'secondProductCategory', 'specificProduct1', 'specificProduct2', 'specificProduct3', 'specificProduct4', 'price', 'contentType'];
+
+    let lookupData = {};
+
+    async function api(url, options) {
+        options = options || {};
+        const resp = await fetch(url, Object.assign({
+            headers: { 'Content-Type': 'application/json' },
+        }, options));
+        const data = await resp.json();
+        if (!resp.ok) throw Object.assign(new Error('API error'), { status: resp.status }, data);
+        return data;
+    }
+
+    function el(tag, attrs, children) {
+        const node = document.createElement(tag);
+        if (attrs) {
+            for (const k in attrs) {
+                if (k === 'class') node.className = attrs[k];
+                else if (k === 'text') node.textContent = attrs[k];
+                else if (k === 'style') node.setAttribute('style', attrs[k]);
+                else if (k.indexOf('data-') === 0) node.setAttribute(k, attrs[k]);
+                else node[k] = attrs[k];
+            }
+        }
+        if (children) {
+            for (const c of children) {
+                if (c == null) continue;
+                node.appendChild(typeof c === 'string' ? document.createTextNode(c) : c);
+            }
+        }
+        return node;
+    }
+
+    function clearChildren(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    // ============ Tabs ============
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            if (btn.dataset.tab === 'generator') populateDropdowns();
+            if (btn.dataset.tab === 'lookup') renderLookup();
+            if (btn.dataset.tab === 'masterblocks') renderMasterblocks();
+        });
+    });
+
+    // ============ Lookup tab ============
+    async function renderLookup() {
+        const grid = document.getElementById('lookup-grid');
+        lookupData = await api('/blockname/api/lookup');
+        clearChildren(grid);
+
+        Object.keys(FIELD_LABELS).forEach(key => {
+            const card = el('div', { class: 'card lookup-card' });
+
+            // Search icon
+            const searchIcon = el('span', { class: 'lookup-search-toggle', text: '🔍' });
+            const searchInput = el('input', { type: 'text', class: 'lookup-search-input', placeholder: 'Søg...' });
+
+            // Header
+            const header = el('div', { class: 'lookup-card-header' }, [
+                el('h3', { text: FIELD_LABELS[key] }),
+                searchIcon,
+            ]);
+            card.appendChild(header);
+
+            // Body
+            const body = el('div', { class: 'lookup-card-body' });
+
+            body.appendChild(searchInput);
+
+            const input = el('input', { type: 'text', placeholder: 'Tilføj værdi...' });
+            const addRow = el('div', { class: 'add-row' }, [input]);
+            body.appendChild(addRow);
+
+            const tagsScroll = el('div', { class: 'tags-scroll' });
+            const tagsContainer = el('div', { class: 'tags-container' });
+            tagsScroll.appendChild(tagsContainer);
+            body.appendChild(tagsScroll);
+            card.appendChild(body);
+
+            grid.appendChild(card);
+
+            // Search toggle
+            searchIcon.addEventListener('click', () => {
+                searchInput.classList.toggle('visible');
+                if (searchInput.classList.contains('visible')) {
+                    searchInput.focus();
+                } else {
+                    searchInput.value = '';
+                    renderTags(tagsContainer, key, lookupData[key] || [], false);
+                }
+            });
+
+            // Live filter
+            searchInput.addEventListener('input', () => {
+                const q = searchInput.value.trim().toUpperCase();
+                const filtered = (lookupData[key] || []).filter(v => !q || v.toUpperCase().includes(q));
+                renderTags(tagsContainer, key, filtered, false);
+            });
+
+            input.addEventListener('keydown', async e => {
+                if (e.key === 'Enter') {
+                    addValueLocal(key, input, tagsContainer);
+                    await saveLookup(key);
+                }
+            });
+
+            renderTags(tagsContainer, key, lookupData[key] || [], false);
+        });
+    }
+
+    function renderTags(container, key, items, isLocked) {
+        clearChildren(container);
+        items.forEach((item, idx) => {
+            const tag = el('span', { class: 'tag' });
+            tag.appendChild(document.createTextNode(item));
+            const remove = el('span', { class: 'remove-tag', text: '×' });
+            remove.addEventListener('click', async () => {
+                lookupData[key].splice(idx, 1);
+                renderTags(container, key, lookupData[key], false);
+                await saveLookup(key);
+            });
+            tag.appendChild(remove);
+            container.appendChild(tag);
+        });
+    }
+
+    function addValueLocal(key, input, container) {
+        const val = input.value.trim().toUpperCase();
+        if (!val) return;
+        if (val.includes(' ')) {
+            input.style.borderColor = 'var(--red)';
+            input.title = 'Mellemrum er ikke tilladt';
+            setTimeout(() => { input.style.borderColor = ''; input.title = ''; }, 2000);
+            return;
+        }
+        if (!lookupData[key]) lookupData[key] = [];
+        if (lookupData[key].includes(val)) {
+            input.style.borderColor = 'var(--red)';
+            setTimeout(() => { input.style.borderColor = ''; }, 1200);
+            return;
+        }
+        lookupData[key].push(val);
+        input.value = '';
+        renderTags(container, key, lookupData[key], false);
+    }
+
+    async function saveLookup(key) {
+        try {
+            const payload = {};
+            payload[key] = lookupData[key];
+            await api('/blockname/api/lookup', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+        } catch (err) {
+            // silent
+        }
+    }
+
+    // ============ Generator tab ============
+    async function populateDropdowns() {
+        lookupData = await api('/blockname/api/lookup');
+        ALL_FIELDS.forEach(field => {
+            const sel = document.getElementById('sel-' + field);
+            if (!sel) return;
+            const current = sel.value;
+            clearChildren(sel);
+            sel.appendChild(el('option', { value: '', text: '— Vælg —' }));
+
+            // specificProduct1-4 all use the "specificProduct" lookup key
+            const lookupKey = field.startsWith('specificProduct') ? 'specificProduct' : field;
+            (lookupData[lookupKey] || []).forEach(v => {
+                sel.appendChild(el('option', { value: v, text: v }));
+            });
+            if (current) sel.value = current;
+        });
+    }
+
+    document.getElementById('btn-generate').addEventListener('click', async () => {
+        let valid = true;
+
+        document.querySelectorAll('.form-group').forEach(fg => fg.classList.remove('error'));
+
+        const payload = {};
+        ALL_FIELDS.forEach(field => {
+            const sel = document.getElementById('sel-' + field);
+            if (!sel.value) {
+                document.getElementById('fg-' + field).classList.add('error');
+                valid = false;
+            }
+            payload[field] = sel.value;
+        });
+
+        payload.notes = document.getElementById('inp-notes').value.trim();
+
+        if (!valid) {
+            showResult('error', 'Udfyld venligst alle påkrævede felter.', '');
+            return;
+        }
+
+        try {
+            const result = await api('/blockname/api/generate', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            showResult('success', 'Block name genereret (ID: ' + result.blockId + ')', result.name);
+            renderHistory();
+        } catch (err) {
+            if (err.status === 409) {
+                showResult('error', 'Duplikat — dette block name eksisterer allerede', err.name || '');
+            } else {
+                const detail = err.details ? err.details.join(', ') : '';
+                showResult('error', err.error || 'Ukendt fejl', detail);
+            }
+        }
+    });
+
+    function showResult(type, label, name) {
+        const box = document.getElementById('result-box');
+        const copyBtn = document.getElementById('btn-copy');
+        box.className = 'result-box ' + type;
+        document.getElementById('result-label').textContent = label;
+        document.getElementById('result-name').textContent = name;
+        copyBtn.style.display = (type === 'success' && name) ? 'inline-flex' : 'none';
+    }
+
+    document.getElementById('btn-copy').addEventListener('click', () => {
+        const name = document.getElementById('result-name').textContent;
+        if (!name) return;
+        navigator.clipboard.writeText(name).then(() => {
+            const btn = document.getElementById('btn-copy');
+            const orig = btn.textContent;
+            btn.textContent = 'Kopieret ✓';
+            setTimeout(() => { btn.textContent = orig; }, 1500);
+        });
+    });
+
+    // ============ History ============
+    let selectedBlockIds = new Set();
+
+    function updateGroupActions() {
+        const bar = document.getElementById('group-actions');
+        const countEl = document.getElementById('selected-count');
+        if (selectedBlockIds.size >= 2) {
+            bar.style.display = 'flex';
+            countEl.textContent = selectedBlockIds.size + ' blocks valgt';
+        } else {
+            bar.style.display = selectedBlockIds.size === 1 ? 'flex' : 'none';
+            countEl.textContent = selectedBlockIds.size === 1 ? '1 block valgt — vælg mindst 2' : '';
+        }
+        document.getElementById('btn-link').disabled = selectedBlockIds.size < 2;
+    }
+
+    document.getElementById('btn-link').addEventListener('click', () => {
+        showMasterPicker();
+    });
+
+    function showMasterPicker() {
+        // Build modal
+        const overlay = el('div', { class: 'modal-overlay' });
+        const box = el('div', { class: 'modal-box' });
+        box.appendChild(el('h3', { text: 'Vælg Master Block' }));
+        box.appendChild(el('p', { class: 'text-sm text-secondary', text: 'Hvilken block skal være master for denne gruppe?', style: 'margin-bottom:16px;' }));
+
+        const options = el('div', { class: 'modal-options' });
+        let selectedMaster = null;
+
+        // Get current history to show names
+        const checkboxes = document.querySelectorAll('.block-cb:checked');
+        const ids = Array.from(selectedBlockIds);
+
+        ids.forEach((bid, i) => {
+            const row = document.querySelector(`[data-block-id="${bid}"]`);
+            const name = row ? row.querySelector('.block-name-cell').textContent : 'Block ' + bid;
+
+            const radio = el('input', { type: 'radio', name: 'master' });
+            if (i === 0) { radio.checked = true; selectedMaster = bid; }
+            radio.addEventListener('change', () => { selectedMaster = bid; });
+
+            const opt = el('div', { class: 'modal-option' }, [
+                radio,
+                el('span', { class: 'opt-id', text: 'ID ' + bid }),
+                el('span', { class: 'opt-name', text: name }),
+            ]);
+            opt.addEventListener('click', () => { radio.checked = true; selectedMaster = bid; });
+            options.appendChild(opt);
+        });
+        box.appendChild(options);
+
+        const actions = el('div', { class: 'modal-actions' }, [
+            (() => {
+                const btn = el('button', { class: 'btn btn-ghost', text: 'Annullér' });
+                btn.addEventListener('click', () => overlay.remove());
+                return btn;
+            })(),
+            (() => {
+                const btn = el('button', { class: 'btn btn-primary', text: 'Opret gruppe' });
+                btn.addEventListener('click', async () => {
+                    try {
+                        await api('/blockname/api/group', {
+                            method: 'POST',
+                            body: JSON.stringify({ blockIds: ids, masterId: selectedMaster }),
+                        });
+                        overlay.remove();
+                        selectedBlockIds.clear();
+                        updateGroupActions();
+                        renderHistory();
+                    } catch (err) {
+                        overlay.remove();
+                        showResult('error', err.error || 'Kunne ikke oprette gruppe', '');
+                    }
+                });
+                return btn;
+            })(),
+        ]);
+        box.appendChild(actions);
+        overlay.appendChild(box);
+
+        // Close on overlay click (not box)
+        overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+        document.body.appendChild(overlay);
+    }
+
+    async function renderHistory() {
+        const history = await api('/blockname/api/history');
+        const tbody = document.getElementById('history-body');
+        const empty = document.getElementById('empty-history');
+        clearChildren(tbody);
+        selectedBlockIds.clear();
+        updateGroupActions();
+
+        if (!history.length) {
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        // Sort descending by blockId (newest first)
+        history.sort((a, b) => (b.blockId || 0) - (a.blockId || 0));
+
+        history.forEach((entry, idx) => {
+            const bid = entry.blockId;
+            const hasGroup = !!entry.groupId;
+            const isMaster = !!entry.isMaster;
+
+            // Checkbox
+            const cb = el('input', { type: 'checkbox', class: 'block-cb' });
+            cb.addEventListener('change', () => {
+                if (cb.checked) selectedBlockIds.add(bid);
+                else selectedBlockIds.delete(bid);
+                updateGroupActions();
+            });
+
+            // Group badge
+            let groupCell;
+            if (hasGroup) {
+                const badge = el('span', {
+                    class: 'group-badge ' + (isMaster ? 'master' : 'child'),
+                    text: (isMaster ? '★ Master' : '○ Gruppe') + ' #' + entry.groupId,
+                });
+                const unlink = el('span', { class: 'unlink', text: '✕' });
+                unlink.title = 'Ophæv gruppe';
+                unlink.addEventListener('click', async (e) => {
+                    e.stopPropagation();
+                    await api('/blockname/api/group/' + entry.groupId, { method: 'DELETE' });
+                    renderHistory();
+                });
+                badge.appendChild(unlink);
+                groupCell = el('td', null, [badge]);
+            } else {
+                groupCell = el('td', { class: 'text-muted text-xs', text: '—' });
+            }
+
+            const tr = el('tr', { 'data-block-id': String(bid) }, [
+                el('td', { class: 'cb-cell' }, [cb]),
+                el('td', { text: String(bid || '-') }),
+                el('td', { class: 'block-name-cell', text: entry.name }),
+                groupCell,
+                el('td', { text: entry.date }),
+                el('td', null, [
+                    (() => {
+                        const btn = el('button', { class: 'btn btn-ghost btn-sm', text: '✕' });
+                        btn.addEventListener('click', async () => {
+                            await api('/blockname/api/history/' + idx, { method: 'DELETE' });
+                            renderHistory();
+                        });
+                        return btn;
+                    })(),
+                ]),
+            ]);
+            if (hasGroup) tr.classList.add('group-row');
+            tbody.appendChild(tr);
+        });
+    }
+
+    // ============ Masterblocks tab ============
+    async function renderMasterblocks() {
+        const container = document.getElementById('masterblocks-container');
+        const empty = document.getElementById('empty-masterblocks');
+        clearChildren(container);
+
+        const history = await api('/blockname/api/history');
+
+        // Group entries by groupId
+        const groups = {};
+        history.forEach(entry => {
+            if (!entry.groupId) return;
+            if (!groups[entry.groupId]) groups[entry.groupId] = [];
+            groups[entry.groupId].push(entry);
+        });
+
+        const groupIds = Object.keys(groups);
+        if (!groupIds.length) {
+            empty.style.display = 'block';
+            return;
+        }
+        empty.style.display = 'none';
+
+        // Sort groups ascending by master's blockId
+        groupIds.sort((a, b) => {
+            const masterA = groups[a].find(m => m.isMaster);
+            const masterB = groups[b].find(m => m.isMaster);
+            return (masterA ? masterA.blockId : 0) - (masterB ? masterB.blockId : 0);
+        });
+
+        groupIds.forEach(gid => {
+            const members = groups[gid];
+            const master = members.find(m => m.isMaster);
+            const children = members.filter(m => !m.isMaster);
+
+            const groupEl = el('div', { class: 'master-group' });
+
+            // Header (master)
+            const header = el('div', { class: 'master-group-header' }, [
+                el('span', { class: 'master-label', text: '★ Master' }),
+                el('span', { class: 'master-name', text: master ? master.name : 'Ukendt master' }),
+                master ? el('span', { class: 'text-muted text-xs', text: 'ID ' + master.blockId }) : null,
+            ]);
+            groupEl.appendChild(header);
+
+            // Children
+            const childrenEl = el('div', { class: 'master-group-children' });
+            children.forEach(child => {
+                const row = el('div', { class: 'master-group-child' }, [
+                    el('span', { class: 'child-id', text: 'ID ' + child.blockId }),
+                    el('span', { text: child.name }),
+                ]);
+                childrenEl.appendChild(row);
+            });
+            groupEl.appendChild(childrenEl);
+            container.appendChild(groupEl);
+        });
+    }
+
+    // ============ Init ============
+    populateDropdowns();
+    renderHistory();
+})();
+</script>
+{% endblock %}

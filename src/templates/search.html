@@ -3,586 +3,372 @@
 
 {% block head %}
 <style>
-    .search-box {
+    .search-bar {
         display: flex;
         gap: 10px;
-        margin-bottom: 20px;
-        align-items: flex-end;
+        align-items: stretch;
+        margin-bottom: 28px;
     }
-    .search-box .search-input {
+    .search-input {
         flex: 1;
-        padding: 10px 16px;
-        font-size: 14px;
+        padding: 12px 16px;
         border: 1px solid var(--border);
-        border-radius: 8px;
+        border-radius: 10px;
+        font-size: 14.5px;
+        font-family: inherit;
         background: var(--bg);
         color: var(--text);
-        transition: all .15s;
+        transition: border-color .12s, box-shadow .12s;
     }
-    .search-box .search-input:focus {
+    .search-input:focus {
         outline: none;
         border-color: var(--accent);
-        box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+        box-shadow: 0 0 0 3px var(--accent-light);
     }
-    .filter-row {
+    .search-input::placeholder { color: var(--text-muted); }
+
+    /* Stats */
+    .search-stats {
         display: flex;
-        gap: 10px;
+        align-items: center;
+        gap: 16px;
         margin-bottom: 20px;
-        flex-wrap: wrap;
-        align-items: center;
-    }
-    .filter-chip {
-        display: inline-flex;
-        align-items: center;
-        gap: 5px;
-        padding: 5px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-        border: 1px solid var(--border);
-        background: var(--bg);
-        cursor: pointer;
-        transition: all .15s;
-        user-select: none;
-    }
-    .filter-chip:hover { border-color: var(--accent); }
-    .filter-chip.active {
-        background: var(--accent-light);
-        border-color: var(--accent);
-        color: var(--accent);
-    }
-    .filter-chip input[type="checkbox"] { display: none; }
-
-    .results-summary {
-        font-size: 13px;
-        color: var(--text-secondary);
-        margin-bottom: 14px;
-    }
-
-    .result-item {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border-light);
-        transition: background .1s;
-    }
-    .result-item:last-child { border-bottom: none; }
-    .result-item:hover { background: var(--bg-secondary); }
-    .result-info { flex: 1; min-width: 0; }
-    .result-name {
-        font-weight: 600;
-        font-size: 14px;
-        margin-bottom: 3px;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .result-meta {
-        font-size: 12px;
-        color: var(--text-muted);
-        display: flex;
-        gap: 14px;
-        flex-wrap: wrap;
-    }
-    .result-type {
-        display: inline-block;
-        padding: 2px 8px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-        background: var(--bg-tertiary);
-        color: var(--text-secondary);
-        margin-left: 12px;
-        white-space: nowrap;
-    }
-    .result-type.email { background: #dbeafe; color: #1d4ed8; }
-    .result-type.block { background: #fef3c7; color: #92400e; }
-
-    .empty-state {
-        text-align: center;
-        padding: 60px 20px;
-        color: var(--text-muted);
-    }
-    .empty-state .icon { font-size: 40px; margin-bottom: 12px; opacity: .6; }
-    .empty-state p { font-size: 14px; }
-
-    .pagination {
-        display: flex;
-        justify-content: center;
-        gap: 8px;
-        margin-top: 20px;
-    }
-
-    .config-warning {
-        background: var(--red-light);
-        border: 1px solid #fecaca;
-        border-radius: var(--radius);
-        padding: 16px 20px;
-        margin-bottom: 20px;
-    }
-    .config-warning strong { color: var(--red); }
-    .config-warning code { font-size: 11px; }
-
-    .loading {
-        display: none;
-        text-align: center;
-        padding: 30px;
-        color: var(--text-muted);
-    }
-    .loading.active { display: block; }
-    .progress-container {
-        margin-top: 16px;
-        width: 100%;
-        max-width: 400px;
-        margin-left: auto;
-        margin-right: auto;
-    }
-    .progress-bar-bg {
-        width: 100%;
-        height: 8px;
-        background: var(--border);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .progress-bar-fill {
-        height: 100%;
-        background: var(--accent);
-        border-radius: 4px;
-        transition: width 0.3s ease;
-        width: 0%;
-    }
-    .progress-text {
-        font-size: 12px;
-        margin-top: 8px;
-        color: var(--text-secondary);
-    }
-
-    .result-journeys {
-        margin-top: 6px;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
-    }
-    .journey-tag {
-        display: inline-flex;
-        align-items: center;
-        gap: 4px;
-        padding: 3px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-    }
-    .journey-tag small { font-weight: 400; opacity: .8; }
-    .journey-running { background: #dcfce7; color: #166534; }
-    .journey-stopped { background: #fef2f2; color: #991b1b; }
-    .journey-draft { background: #f1f5f9; color: #475569; }
-
-    .mapping-chain {
-        margin-top: 8px;
-        padding: 8px 12px;
+        padding: 14px 18px;
         background: var(--bg-secondary);
-        border-radius: 8px;
-        border-left: 3px solid var(--accent);
-    }
-    .mapping-chain-title {
-        font-size: 11px;
-        font-weight: 600;
+        border-radius: var(--radius);
+        font-size: 13.5px;
         color: var(--text-secondary);
-        margin-bottom: 6px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    .mapping-email {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 4px 0;
-        font-size: 12px;
         flex-wrap: wrap;
     }
-    .mapping-email-name {
-        font-weight: 500;
+    .search-stats .stat-value {
+        font-weight: 600;
         color: var(--text);
     }
-    .mapping-arrow {
-        color: var(--text-muted);
-        font-size: 10px;
-    }
-    .mapping-email-journeys {
-        display: flex;
-        gap: 4px;
-        flex-wrap: wrap;
-    }
-    .mapping-no-emails {
-        font-size: 11px;
-        color: var(--text-muted);
-        font-style: italic;
+    .search-stats .stat-query {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12.5px;
+        background: var(--accent-light);
+        color: var(--accent);
+        padding: 3px 10px;
+        border-radius: 6px;
+        font-weight: 500;
     }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spinner {
+    /* Results list */
+    .results-list { display: flex; flex-direction: column; gap: 12px; }
+
+    .result-card {
+        background: var(--bg);
+        border-radius: var(--radius);
+        border: 1px solid var(--border);
+        overflow: hidden;
+        transition: box-shadow .15s, border-color .15s;
+    }
+    .result-card:hover {
+        box-shadow: var(--shadow);
+        border-color: var(--accent-light);
+    }
+
+    .result-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px 20px 12px;
+    }
+    .result-file-icon {
+        width: 34px;
+        height: 34px;
+        border-radius: 9px;
+        background: var(--accent-light);
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 15px;
+        flex-shrink: 0;
+    }
+    .result-file-info { flex: 1; min-width: 0; }
+    .result-file-name {
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--text);
+        word-break: break-word;
+    }
+    .result-meta {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 3px;
+        font-size: 12px;
+        color: var(--text-muted);
+    }
+    .result-meta .type-badge {
+        background: var(--bg-secondary);
+        padding: 2px 8px;
+        border-radius: 4px;
+        font-weight: 500;
+        font-size: 11px;
+    }
+    .result-badge {
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 11px;
+        font-weight: 600;
+        padding: 4px 10px;
+        border-radius: 20px;
+        white-space: nowrap;
+    }
+
+    .result-snippets {
+        padding: 0 20px 16px;
+    }
+    .snippet {
+        margin-top: 8px;
+        padding: 10px 14px;
+        background: var(--bg-secondary);
+        border-radius: 8px;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 12px;
+        line-height: 1.7;
+        color: var(--text-secondary);
+        white-space: pre-wrap;
+        word-break: break-word;
+        overflow: hidden;
+        max-height: 120px;
+    }
+    .snippet mark {
+        background: var(--amber-light);
+        color: var(--text);
+        border-radius: 3px;
+        padding: 1px 2px;
+    }
+
+    /* Pagination */
+    .pagination {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        margin-top: 28px;
+    }
+    .pagination .page-info {
+        font-size: 13px;
+        color: var(--text-secondary);
+    }
+
+    /* Error banner */
+    .search-error {
+        padding: 18px 22px;
+        background: var(--red-light);
+        border-radius: var(--radius);
+        color: var(--red);
+        font-size: 13.5px;
+        margin-bottom: 20px;
+    }
+    .search-error strong { display: block; margin-bottom: 4px; }
+
+    /* Empty / loading states */
+    .search-empty {
+        text-align: center;
+        padding: 64px 20px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+    .search-empty::before {
+        content: "⌘";
+        display: block;
+        font-size: 32px;
+        margin-bottom: 12px;
+        color: var(--bg-tertiary);
+    }
+    .search-loading {
+        text-align: center;
+        padding: 40px 20px;
+        color: var(--text-muted);
+        font-size: 13.5px;
+    }
+    .search-loading::before {
+        content: "";
         display: inline-block;
-        width: 20px; height: 20px;
+        width: 18px;
+        height: 18px;
         border: 2px solid var(--border);
         border-top-color: var(--accent);
         border-radius: 50%;
         animation: spin .6s linear infinite;
-        margin-right: 8px;
+        margin-right: 10px;
         vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .no-results {
+        text-align: center;
+        padding: 56px 20px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+    .no-results::before {
+        content: "∅";
+        display: block;
+        font-size: 28px;
+        margin-bottom: 10px;
+        color: var(--bg-tertiary);
     }
 </style>
 {% endblock %}
 
 {% block content %}
-<div style="margin-bottom:20px;">
-    <h2 style="font-size:22px; font-weight:700; letter-spacing:-0.3px;">Content Search</h2>
-    <p class="text-secondary text-sm" style="margin-top:4px;">Search for emails and content blocks in SFMC Content Builder.</p>
+<div class="page-header">
+    <h1>Content Search</h1>
+    <p>Søg efter en streng på tværs af alle emails og content blocks i SFMC Content Builder.</p>
 </div>
 
-{% if not configured %}
-<div class="config-warning">
-    <strong>&#9888; SFMC API not configured</strong>
-    <p style="margin-top:8px; font-size:13px; color:var(--text-secondary);">
-        Set the following environment variables before starting the app:
-    </p>
-    <ul style="margin-top:8px; font-size:12px; color:var(--text-secondary); list-style:disc; padding-left:20px;">
-        <li><code>SFMC_CLIENT_ID</code></li>
-        <li><code>SFMC_CLIENT_SECRET</code></li>
-        <li><code>SFMC_AUTH_BASE_URI</code> (e.g. https://YOUR_SUBDOMAIN.auth.marketingcloudapis.com)</li>
-        <li><code>SFMC_REST_BASE_URI</code> (e.g. https://YOUR_SUBDOMAIN.rest.marketingcloudapis.com)</li>
-    </ul>
+<div class="search-bar">
+    <input type="text" class="search-input" id="search-input" placeholder="Søg i SFMC-indhold — fx variabelnavn, AMPScript-funktion, tekst..." autofocus>
+    <button class="btn btn-primary btn-lg" id="btn-search">Søg</button>
 </div>
-{% endif %}
 
-<div class="card">
-    <div class="card-body">
-        <div class="search-box">
-            <input type="text" class="search-input" id="search-input" placeholder="Search emails and content blocks..." autocomplete="off" {% if not configured %}disabled{% endif %}>
-            <button class="btn btn-primary" id="btn-search" {% if not configured %}disabled{% endif %}>
-                &#128269; Search
-            </button>
-        </div>
-        <div class="filter-row">
-            <span style="font-size:12px; font-weight:500; color:var(--text-secondary);">Filter:</span>
-            <label class="filter-chip active" data-type="htmlemail">
-                <input type="checkbox" value="htmlemail" checked> Emails
-            </label>
-            <label class="filter-chip active" data-type="templatebasedemail">
-                <input type="checkbox" value="templatebasedemail" checked> Template Emails
-            </label>
-            <label class="filter-chip active" data-type="contentblock">
-                <input type="checkbox" value="contentblock" checked> Content Blocks
-            </label>
-            <span style="margin-left:auto; display:flex; align-items:center; gap:8px;">
-                <label style="font-size:12px; font-weight:500; color:var(--text-secondary);">Sort:</label>
-                <select id="sort-field" style="padding:4px 8px; font-size:12px; border-radius:6px; border:1px solid var(--border);">
-                    <option value="modifiedDate">Modified Date</option>
-                    <option value="createdDate">Created Date</option>
-                    <option value="name">Name</option>
-                </select>
-                <select id="sort-direction" style="padding:4px 8px; font-size:12px; border-radius:6px; border:1px solid var(--border);">
-                    <option value="DESC">Newest first</option>
-                    <option value="ASC">Oldest first</option>
-                </select>
-            </span>
-        </div>
-        <div style="margin-top:8px;">
-            <label style="font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; color:var(--text-secondary);">
-                <input type="checkbox" id="include-journeys"> Show journey associations
-            </label>
-            <label style="font-size:12px; cursor:pointer; display:inline-flex; align-items:center; gap:5px; color:var(--text-secondary); margin-left:16px;">
-                <input type="checkbox" id="include-mapping"> Show content mapping (Block → Email → Journey)
-            </label>
-        </div>
+<div id="search-results">
+    <div class="search-empty" id="search-empty">
+        Indtast en søgestreng for at søge på tværs af SFMC Content Builder.
     </div>
-</div>
-
-<div class="loading" id="loading">
-    <span class="spinner"></span> Searching all SFMC content...
-    <div class="progress-container">
-        <div class="progress-bar-bg"><div class="progress-bar-fill" id="progress-bar"></div></div>
-        <div class="progress-text" id="progress-text">Initializing...</div>
-    </div>
-</div>
-
-<div id="results-container" style="display:none;">
-    <div class="results-summary" id="results-summary"></div>
-    <div class="card">
-        <div id="results-list"></div>
-    </div>
-    <div class="pagination" id="pagination"></div>
-</div>
-
-<div class="empty-state" id="empty-state">
-    <div class="icon">&#128270;</div>
-    <p>Enter a search term to find emails and content blocks in SFMC.</p>
-</div>
-
-<div class="empty-state" id="no-results" style="display:none;">
-    <div class="icon">&#128528;</div>
-    <p>No results found. Try a different search term.</p>
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-(function() {
-    const searchInput = document.getElementById('search-input');
+(function () {
+    const input = document.getElementById('search-input');
     const btnSearch = document.getElementById('btn-search');
-    const loading = document.getElementById('loading');
-    const resultsContainer = document.getElementById('results-container');
-    const resultsList = document.getElementById('results-list');
-    const resultsSummary = document.getElementById('results-summary');
-    const pagination = document.getElementById('pagination');
-    const emptyState = document.getElementById('empty-state');
-    const noResults = document.getElementById('no-results');
-    const sortField = document.getElementById('sort-field');
-    const sortDirection = document.getElementById('sort-direction');
-    const includeJourneys = document.getElementById('include-journeys');
-    const includeMapping = document.getElementById('include-mapping');
-
-    let currentPage = 1;
+    const resultsContainer = document.getElementById('search-results');
     let currentQuery = '';
-    let cachedResults = null; // Cache all results from the last search
-    const PAGE_SIZE = 50;
+    let currentPage = 1;
 
-    function getSelectedTypes() {
-        const allChips = document.querySelectorAll('.filter-chip input[type="checkbox"]');
-        const checkedChips = document.querySelectorAll('.filter-chip input[type="checkbox"]:checked');
-        if (checkedChips.length === allChips.length) return [];
-        return Array.from(checkedChips).map(cb => cb.value);
+    function escapeHtml(str) {
+        return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    document.querySelectorAll('.filter-chip').forEach(chip => {
-        chip.addEventListener('click', function(e) {
-            const cb = this.querySelector('input[type="checkbox"]');
-            cb.checked = !cb.checked;
-            this.classList.toggle('active', cb.checked);
-        });
-    });
+    function highlightRaw(text, query) {
+        const escapedText = escapeHtml(text);
+        const escapedQuery = escapeHtml(query).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return escapedText.replace(new RegExp(escapedQuery, 'gi'), match => '<mark>' + match + '</mark>');
+    }
 
-    // Re-search when sort changes
-    sortField.addEventListener('change', () => { if (currentQuery) doSearch(); });
-    sortDirection.addEventListener('change', () => { if (currentQuery) doSearch(); });
+    function typeIcon(type) {
+        const t = (type || '').toLowerCase();
+        if (t.includes('email')) return '✉️';
+        if (t.includes('template')) return '📐';
+        if (t.includes('block') || t.includes('html')) return '◇';
+        if (t.includes('text')) return '📝';
+        return '📄';
+    }
 
-    function doSearch() {
-        const query = searchInput.value.trim();
+    async function doSearch(page) {
+        const query = input.value.trim();
         if (!query) return;
-
-        currentQuery = query;
-        currentPage = 1;
-        cachedResults = null;
-        const types = getSelectedTypes();
-
-        // UI state
-        loading.classList.add('active');
-        resultsContainer.style.display = 'none';
-        emptyState.style.display = 'none';
-        noResults.style.display = 'none';
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        progressBar.style.width = '0%';
-        progressText.textContent = 'Initializing...';
-
-        fetch('/search/query', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-                query: currentQuery,
-                asset_types: types.length > 0 ? types : null,
-                page: 1,
-                sort_field: sortField.value,
-                sort_direction: sortDirection.value,
-                include_journeys: includeJourneys.checked,
-                include_mapping: includeMapping.checked,
-            })
-        })
-        .then(response => {
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
-
-            function processStream() {
-                return reader.read().then(({done, value}) => {
-                    if (done) return;
-                    buffer += decoder.decode(value, {stream: true});
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop();
-                    for (const line of lines) {
-                        if (line.startsWith('data: ')) {
-                            const event = JSON.parse(line.slice(6));
-                            if (event.type === 'progress') {
-                                const pct = event.total > 0 ? Math.round((event.scanned / event.total) * 100) : 0;
-                                progressBar.style.width = pct + '%';
-                                progressText.textContent = `Scanned ${event.scanned} / ${event.total} assets — ${event.matches} match${event.matches !== 1 ? 'es' : ''} found`;
-                            } else if (event.type === 'progress_mapping') {
-                                const pct = event.total > 0 ? Math.round((event.scanned / event.total) * 100) : 0;
-                                progressBar.style.width = pct + '%';
-                                progressText.textContent = `Mapping content blocks → emails: ${event.scanned} / ${event.total} emails scanned`;
-                            } else if (event.type === 'result') {
-                                cachedResults = event.data.items;
-                                loading.classList.remove('active');
-                                showPage(1);
-                                return;
-                            } else if (event.type === 'error') {
-                                loading.classList.remove('active');
-                                noResults.querySelector('p').textContent = event.error;
-                                noResults.style.display = 'block';
-                                return;
-                            }
-                        }
-                    }
-                    return processStream();
-                });
-            }
-            return processStream();
-        })
-        .catch(err => {
-            loading.classList.remove('active');
-            noResults.querySelector('p').textContent = 'Network error: ' + err.message;
-            noResults.style.display = 'block';
-        });
-    }
-
-    function showPage(page) {
-        if (!cachedResults) return;
-        currentPage = page;
-
-        if (cachedResults.length === 0) {
-            noResults.style.display = 'block';
-            noResults.querySelector('p').textContent = 'No results found. Try a different search term.';
-            resultsContainer.style.display = 'none';
+        if (query.length < 2) {
+            resultsContainer.innerHTML = '<div class="no-results">Søgestrengen skal være mindst 2 tegn.</div>';
             return;
         }
 
-        const totalCount = cachedResults.length;
-        const start = (currentPage - 1) * PAGE_SIZE;
-        const end = Math.min(start + PAGE_SIZE, totalCount);
-        const pageItems = cachedResults.slice(start, end);
+        currentQuery = query;
+        currentPage = page || 1;
 
-        // Show results
-        resultsContainer.style.display = 'block';
-        resultsSummary.textContent = `Showing ${start + 1}\u2013${end} of ${totalCount} results`;
+        resultsContainer.innerHTML = '<div class="search-loading">Søger i SFMC Content Builder...</div>';
+        btnSearch.disabled = true;
 
-        resultsList.innerHTML = '';
-        const friendlyTypes = {
-            'webpage': 'CloudPage',
-            'web': 'CloudPage',
-            'htmlblock': 'Content Block',
-            'codesnippetblock': 'Code Snippet',
-            'contentblock': 'Content Block',
-            'htmlemail': 'HTML Email',
-            'templatebasedemail': 'Template Email',
-            'textonlyemail': 'Text Email',
-            'jsonmessage': 'SMS/Push',
-            'smartcaptureblock': 'Smart Capture',
-            'socialshareblock': 'Social Share',
-            'buttonblock': 'Button Block',
-            'layoutblock': 'Layout Block',
-            'freeformblock': 'Freeform Block',
-            'textblock': 'Text Block',
-            'imageblock': 'Image Block',
-            'dynamiccontentblock': 'Dynamic Content',
-            'abtest': 'A/B Test',
-        };
-        pageItems.forEach(item => {
-            const rawType = (item.assetType || '').toLowerCase();
-            const typeClass = rawType.includes('email') ? 'email' : 'block';
-            const typeLabel = friendlyTypes[rawType] || item.assetType || 'Unknown';
-            const subject = item.subject ? `Subject: ${item.subject}` : '';
-            const category = item.category ? `Folder: ${item.category}` : '';
-            const modified = item.modifiedDate ? `Modified: ${new Date(item.modifiedDate).toLocaleDateString()}` : '';
-            const created = item.createdDate ? `Created: ${new Date(item.createdDate).toLocaleDateString()}` : '';
+        try {
+            const params = new URLSearchParams({ q: query, page: String(currentPage) });
+            const resp = await fetch('/search/api/search?' + params.toString());
+            const data = await resp.json();
 
-            // Journey info
-            let journeyHtml = '';
-            if (item.journeys && item.journeys.length > 0) {
-                const journeyTags = item.journeys.map(j => {
-                    const statusClass = j.status === 'Running' ? 'journey-running' :
-                                       j.status === 'Stopped' ? 'journey-stopped' : 'journey-draft';
-                    return `<span class="journey-tag ${statusClass}">${escapeHtml(j.name)} <small>(${escapeHtml(j.status)})</small></span>`;
-                }).join('');
-                journeyHtml = `<div class="result-journeys">${journeyTags}</div>`;
-            } else if (includeJourneys.checked && rawType.includes('email')) {
-                journeyHtml = '<div class="result-journeys"><span style="color:var(--text-muted); font-size:11px;">No journeys</span></div>';
+            if (!resp.ok) {
+                resultsContainer.innerHTML = '<div class="search-error"><strong>Fejl</strong>' + escapeHtml(data.error || 'Ukendt fejl') + '</div>';
+                return;
             }
 
-            // Content mapping (Block → Email → Journey)
-            let mappingHtml = '';
-            if (item.parentEmails && item.parentEmails.length > 0) {
-                const emailEntries = item.parentEmails.map(em => {
-                    let journeyPart = '';
-                    if (em.journeys && em.journeys.length > 0) {
-                        const jTags = em.journeys.map(j => {
-                            const sc = j.status === 'Running' ? 'journey-running' :
-                                       j.status === 'Stopped' ? 'journey-stopped' : 'journey-draft';
-                            return `<span class="journey-tag ${sc}">${escapeHtml(j.name)} <small>(${escapeHtml(j.status)})</small></span>`;
-                        }).join('');
-                        journeyPart = `<span class="mapping-arrow">→</span><div class="mapping-email-journeys">${jTags}</div>`;
-                    } else if (includeJourneys.checked) {
-                        journeyPart = '<span style="color:var(--text-muted); font-size:11px; margin-left:4px;">No journeys</span>';
-                    }
-                    return `<div class="mapping-email"><span class="mapping-email-name">${escapeHtml(em.name)}</span>${journeyPart}</div>`;
-                }).join('');
-                mappingHtml = `<div class="mapping-chain"><div class="mapping-chain-title">Used in Emails</div>${emailEntries}</div>`;
-            } else if (includeMapping.checked && !rawType.includes('email')) {
-                mappingHtml = '<div class="mapping-chain"><span class="mapping-no-emails">No parent emails found</span></div>';
+            if (data.totalCount === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">Ingen assets i SFMC indeholder "' + escapeHtml(query) + '".</div>';
+                return;
             }
 
-            const div = document.createElement('div');
-            div.className = 'result-item';
-            div.innerHTML = `
-                <div class="result-info">
-                    <div class="result-name">${escapeHtml(item.name)}</div>
-                    <div class="result-meta">
-                        ${subject ? '<span>' + escapeHtml(subject) + '</span>' : ''}
-                        ${category ? '<span>' + escapeHtml(category) + '</span>' : ''}
-                        ${created ? '<span>' + escapeHtml(created) + '</span>' : ''}
-                        ${modified ? '<span>' + escapeHtml(modified) + '</span>' : ''}
-                    </div>
-                    ${journeyHtml}
-                    ${mappingHtml}
-                </div>
-                <span class="result-type ${typeClass}">${escapeHtml(typeLabel)}</span>
-            `;
-            resultsList.appendChild(div);
-        });
+            let html = '';
 
-        // Pagination
-        const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-        pagination.innerHTML = '';
-        if (totalPages > 1) {
-            if (currentPage > 1) {
-                const prev = document.createElement('button');
-                prev.className = 'btn btn-sm';
-                prev.textContent = '\u2190 Prev';
-                prev.onclick = () => showPage(currentPage - 1);
-                pagination.appendChild(prev);
+            // Stats bar
+            html += '<div class="search-stats">';
+            html += '<span><span class="stat-value">' + data.totalCount + '</span> asset' + (data.totalCount !== 1 ? 's' : '') + ' fundet</span>';
+            html += '<span>Side <span class="stat-value">' + data.page + '</span> af <span class="stat-value">' + Math.ceil(data.totalCount / data.pageSize) + '</span></span>';
+            html += '<span class="stat-query">' + escapeHtml(data.query) + '</span>';
+            html += '</div>';
+
+            // Results
+            html += '<div class="results-list">';
+            data.results.forEach(function (result) {
+                html += '<div class="result-card">';
+                html += '<div class="result-header">';
+                html += '<div class="result-file-icon">' + typeIcon(result.assetType) + '</div>';
+                html += '<div class="result-file-info">';
+                html += '<div class="result-file-name">' + escapeHtml(result.name) + '</div>';
+                html += '<div class="result-meta">';
+                html += '<span class="type-badge">' + escapeHtml(result.assetType) + '</span>';
+                if (result.folder) {
+                    html += '<span>📁 ' + escapeHtml(result.folder) + '</span>';
+                }
+                if (result.modifiedDate) {
+                    const d = new Date(result.modifiedDate);
+                    html += '<span>' + d.toLocaleDateString('da-DK') + '</span>';
+                }
+                html += '</div>';
+                html += '</div>';
+                if (result.matchCount > 0) {
+                    html += '<span class="result-badge">' + result.matchCount + ' match' + (result.matchCount !== 1 ? 'es' : '') + '</span>';
+                }
+                html += '</div>';
+
+                if (result.snippets && result.snippets.length) {
+                    html += '<div class="result-snippets">';
+                    result.snippets.forEach(function (snippet) {
+                        html += '<div class="snippet">' + highlightRaw(snippet.context, query) + '</div>';
+                    });
+                    html += '</div>';
+                }
+
+                html += '</div>';
+            });
+            html += '</div>';
+
+            // Pagination
+            const totalPages = Math.ceil(data.totalCount / data.pageSize);
+            if (totalPages > 1) {
+                html += '<div class="pagination">';
+                if (currentPage > 1) {
+                    html += '<button class="btn btn-sm" id="btn-prev">← Forrige</button>';
+                }
+                html += '<span class="page-info">Side ' + currentPage + ' af ' + totalPages + '</span>';
+                if (currentPage < totalPages) {
+                    html += '<button class="btn btn-sm" id="btn-next">Næste →</button>';
+                }
+                html += '</div>';
             }
-            const info = document.createElement('span');
-            info.style.cssText = 'font-size:12px;color:var(--text-muted);align-self:center;';
-            info.textContent = `Page ${currentPage} of ${totalPages}`;
-            pagination.appendChild(info);
-            if (currentPage < totalPages) {
-                const next = document.createElement('button');
-                next.className = 'btn btn-sm';
-                next.textContent = 'Next \u2192';
-                next.onclick = () => showPage(currentPage + 1);
-                pagination.appendChild(next);
-            }
+
+            resultsContainer.innerHTML = html;
+
+            // Pagination event listeners
+            const btnPrev = document.getElementById('btn-prev');
+            const btnNext = document.getElementById('btn-next');
+            if (btnPrev) btnPrev.addEventListener('click', () => doSearch(currentPage - 1));
+            if (btnNext) btnNext.addEventListener('click', () => doSearch(currentPage + 1));
+
+        } catch (err) {
+            resultsContainer.innerHTML = '<div class="search-error"><strong>Netværksfejl</strong>Kunne ikke kontakte serveren. Prøv igen.</div>';
+        } finally {
+            btnSearch.disabled = false;
         }
     }
 
-    function escapeHtml(str) {
-        const d = document.createElement('div');
-        d.textContent = str;
-        return d.innerHTML;
-    }
-
-    btnSearch.addEventListener('click', () => doSearch());
-    searchInput.addEventListener('keydown', e => {
-        if (e.key === 'Enter') doSearch();
+    btnSearch.addEventListener('click', () => doSearch(1));
+    input.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') doSearch(1);
     });
 })();
 </script>
